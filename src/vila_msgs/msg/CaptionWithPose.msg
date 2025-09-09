@@ -17,3 +17,6 @@ builtin_interfaces/Time timestamp
 
 # Number of images used to generate this caption
 uint32 image_count
+
+# Duration of the segment in seconds
+float64 duration
