@@ -55,6 +55,7 @@ class MilvusService:
         schema.add_field(field_name="position", datatype=DataType.FLOAT_VECTOR, dim=3)
         schema.add_field(field_name="theta", datatype=DataType.FLOAT, dim=1)
         schema.add_field(field_name="time", datatype=DataType.FLOAT_VECTOR, dim=2)
+        schema.add_field(field_name="duration", datatype=DataType.FLOAT, dim=1)
 
         # Create index parameters for vector fields
         index_params = self.client.prepare_index_params()
