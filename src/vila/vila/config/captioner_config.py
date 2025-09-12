@@ -13,7 +13,8 @@ class CaptionerConfig:
     prompt_text: str = 'Describe what you see in these images.'
     conv_mode: str = 'vicuna_v1'
     segment_time: float = 3.0
-    image_topic: str = '/camera/camera/color/image_raw/compressed'
+    compressed_image_topic: str = '/camera/camera/color/image_raw/compressed'
+    raw_image_topic: str = '/camera/image_raw'
     odom_topic: str = '/odom'
     output_topic: str = '/caption_with_pose'
     max_buffer_size: int = 90
@@ -35,7 +36,8 @@ class CaptionerConfig:
         node.declare_parameter('prompt_text', defaults['prompt_text'])
         node.declare_parameter('conv_mode', defaults['conv_mode'])
         node.declare_parameter('segment_time', defaults['segment_time'])
-        node.declare_parameter('image_topic', defaults['image_topic'])
+        node.declare_parameter('compressed_image_topic', defaults['compressed_image_topic'])
+        node.declare_parameter('raw_image_topic', defaults['raw_image_topic'])
         node.declare_parameter('odom_topic', defaults['odom_topic'])
         node.declare_parameter('output_topic', defaults['output_topic'])
         node.declare_parameter('max_buffer_size', defaults['max_buffer_size'])
@@ -48,7 +50,8 @@ class CaptionerConfig:
             prompt_text=node.get_parameter('prompt_text').value,
             conv_mode=node.get_parameter('conv_mode').value,
             segment_time=node.get_parameter('segment_time').value,
-            image_topic=node.get_parameter('image_topic').value,
+            compressed_image_topic=node.get_parameter('compressed_image_topic').value,
+            raw_image_topic=node.get_parameter('raw_image_topic').value,
             odom_topic=node.get_parameter('odom_topic').value,
             output_topic=node.get_parameter('output_topic').value,
             max_buffer_size=node.get_parameter('max_buffer_size').value,
