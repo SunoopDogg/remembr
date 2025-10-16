@@ -1,0 +1,28 @@
+services:
+  ros-humble-docker:
+    build:
+      context: .
+    image: cuda12.9.1-node22.20.0-python3.13.9:bookworm-slim-uv-ros-humble
+    container_name: ros-humble-docker
+    tty: true
+    ipc: host
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - .:/root/ros-humble-docker
+      - /tmp/.X11-unix:/tmp/.X11-unix
+
+  ros-humble-docker-gpu:
+    extends:
+      service: ros-humble-docker
+    container_name: ros-humble-docker-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - gpu
