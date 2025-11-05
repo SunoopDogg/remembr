@@ -352,6 +352,8 @@ def main(args=None):
 
     try:
         rclpy.spin(captioner)
+    except KeyboardInterrupt:
+        captioner.get_logger().info('Keyboard interrupt, shutting down...')
     finally:
         captioner.destroy_node()
         rclpy.shutdown()
