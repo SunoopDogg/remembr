@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>vila</name>
+  <name>milvus</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="aswoo55555@gmail.com">root</maintainer>
@@ -17,9 +17,7 @@
   </export>
 
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  
+
   <depend>vila_msgs</depend>
+
 </package>
