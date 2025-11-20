@@ -1,7 +1,6 @@
-"""MilvusMemoryRecord model - record format for Milvus database insertion."""
-
 import time
 from dataclasses import dataclass
+
 from .caption_data import CaptionData
 from .vector_data import VectorData
 

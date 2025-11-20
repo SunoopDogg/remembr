@@ -1,6 +1,5 @@
-"""DataPipeline - orchestrates data transformation pipeline."""
-
 from vila_msgs.msg import CaptionWithPose
+
 from ..models.caption_data import CaptionData
 from ..models.vector_data import VectorData
 from ..models.milvus_record import MilvusMemoryRecord

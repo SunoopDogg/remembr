@@ -1,7 +1,6 @@
-"""VectorData model - computed vector embeddings for Milvus storage."""
-
 from dataclasses import dataclass
 from sentence_transformers import SentenceTransformer
+
 from .caption_data import CaptionData
 
 

@@ -1,6 +1,5 @@
-"""CaptionData model - immutable snapshot of ROS caption message data."""
-
 from dataclasses import dataclass
+
 from vila_msgs.msg import CaptionWithPose
 
 

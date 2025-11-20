@@ -1,5 +1,3 @@
-"""EmbeddingService - manages embedding model loading and encoding."""
-
 import traceback
 from sentence_transformers import SentenceTransformer
 

@@ -1,7 +1,6 @@
-"""MilvusService - handles all Milvus database operations."""
-
 import traceback
 from pymilvus import MilvusClient, DataType
+
 from ..config.database_config import DatabaseConfig
 from ..models.milvus_record import MilvusMemoryRecord
 

@@ -1,5 +1,3 @@
-"""Database configuration for Milvus memory builder."""
-
 import os
 from dataclasses import dataclass, field
 
