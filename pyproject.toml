@@ -26,7 +26,11 @@ vila = [
     "triton==3.1.0",
 ]
 
-milvus = []
+milvus = [
+    "langchain-huggingface>=1.2.0",
+    "pymilvus[milvus-lite]>=2.6.6",
+    "sentence-transformers>=5.2.0",
+]
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch", "wheel"]
