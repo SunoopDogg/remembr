@@ -1,6 +1,6 @@
-from .database_config import DatabaseConfig, EMBEDDING_MODEL
+from .database_config import DatabaseConfig, FIXED_SUBTRACT
 
 __all__ = [
     'DatabaseConfig',
-    'EMBEDDING_MODEL'
+    'FIXED_SUBTRACT',
 ]
