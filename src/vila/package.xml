@@ -5,7 +5,14 @@
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="aswoo55555@gmail.com">root</maintainer>
-  <license>Apache-2.0</license>
+  <license>TODO: License declaration</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  
+  <depend>vila_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -15,11 +22,4 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
-
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  
-  <depend>vila_msgs</depend>
 </package>
