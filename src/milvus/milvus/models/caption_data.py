@@ -5,19 +5,20 @@ from vila_msgs.msg import CaptionWithPose
 
 @dataclass(frozen=True, slots=True)
 class CaptionData:
-    """Immutable snapshot of caption data from ROS message."""
+    """Immutable caption data extracted from ROS message."""
+
     caption: str
     position_x: float
     position_y: float
     position_z: float
-    theta: float  # radians
+    theta: float
     timestamp_sec: int
     timestamp_nanosec: int
     image_count: int
 
     @classmethod
     def from_ros_msg(cls, msg: CaptionWithPose) -> 'CaptionData':
-        """Create CaptionData from ROS CaptionWithPose message."""
+        """Create from ROS CaptionWithPose message."""
         return cls(
             caption=msg.caption,
             position_x=float(msg.position_x),
@@ -29,8 +30,7 @@ class CaptionData:
             image_count=int(msg.image_count)
         )
 
-    def __post_init__(self):
-        """Validate caption data."""
+    def __post_init__(self) -> None:
         if not self.caption.strip():
             raise ValueError("Caption cannot be empty")
         if not -2 * 3.14159 <= self.theta <= 2 * 3.14159:

@@ -3,7 +3,7 @@ git clone https://huggingface.co/Efficient-Large-Model/NVILA-Lite-8B
 source /opt/ros/humble/setup.bash
 
 apt update
-apt install ros-humble-cv-bridge -y
+apt install ros-humble-cv-bridge -q -y
 
 rm -rf /var/lib/apt/lists/*
 

@@ -1,21 +1,25 @@
 import traceback
+from typing import Protocol
+
 from pymilvus import MilvusClient, DataType
 
 from ..config.database_config import DatabaseConfig
 from ..models.milvus_record import MilvusMemoryRecord
 
 
+class Logger(Protocol):
+    """Protocol for ROS2-compatible logger."""
+
+    def info(self, msg: str) -> None: ...
+    def warn(self, msg: str) -> None: ...
+    def error(self, msg: str) -> None: ...
+    def warning(self, msg: str) -> None: ...
+
+
 class MilvusService:
-    """Handles all Milvus database operations."""
+    """Milvus database operations service."""
 
-    def __init__(self, config: DatabaseConfig, logger):
-        """
-        Initialize Milvus service.
-
-        Args:
-            config: Database configuration
-            logger: ROS2 logger instance
-        """
+    def __init__(self, config: DatabaseConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
         self.client = None
@@ -32,8 +36,7 @@ class MilvusService:
             raise
 
     def setup_collection(self) -> None:
-        """Set up Milvus collection with proper schema."""
-        # Check if collection exists
+        """Set up Milvus collection with schema and indexes."""
         if self.client.has_collection(self.config.collection_name):
             self.logger.info(f'Collection "{self.config.collection_name}" already exists')
             return
@@ -90,22 +93,18 @@ class MilvusService:
         self.logger.info(f'Created collection "{self.config.collection_name}" with schema')
 
     def reset_database(self) -> None:
-        """
-        Reset Milvus database by dropping and recreating the collection.
-        Called when --reset flag is used.
-        """
-        self.logger.info('🔄 Starting database reset...')
+        """Reset database by dropping and recreating collection."""
+        self.logger.info('Starting database reset...')
 
         try:
             # Drop collection if it exists
             if self.client.has_collection(self.config.collection_name):
                 self.logger.info(f'Dropping collection "{self.config.collection_name}"...')
                 self.client.drop_collection(self.config.collection_name)
-                self.logger.info(f'✓ Collection "{self.config.collection_name}" dropped')
+                self.logger.info(f'Collection "{self.config.collection_name}" dropped')
 
-            # Recreate collection
             self.setup_collection()
-            self.logger.info('✅ Database reset complete - starting fresh')
+            self.logger.info('Database reset complete')
 
         except Exception as e:
             self.logger.error(f'Error during database reset: {e}')
@@ -113,18 +112,7 @@ class MilvusService:
             raise
 
     def insert_record(self, record: MilvusMemoryRecord) -> dict:
-        """
-        Insert record into Milvus collection.
-
-        Args:
-            record: MilvusMemoryRecord to insert
-
-        Returns:
-            Result dictionary from Milvus insertion
-
-        Raises:
-            Exception: If insertion fails
-        """
+        """Insert record into Milvus collection."""
         try:
             result = self.client.insert(
                 collection_name=self.config.collection_name,
@@ -141,7 +129,7 @@ class MilvusService:
         return self.client.has_collection(self.config.collection_name)
 
     def close(self) -> None:
-        """Close Milvus connection and cleanup resources."""
+        """Close Milvus connection."""
         if self.client and hasattr(self.client, 'close'):
             try:
                 self.client.close()
