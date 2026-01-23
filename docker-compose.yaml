@@ -2,7 +2,7 @@ services:
   remembr:
     build:
       context: .
-    image: cuda12.9.1-node22.20.0-python3.13.9:bookworm-slim-uv-ros-humble
+    image: cuda12.9.1-python3.14.2:bookworm-slim-ros-humble-uv
     container_name: remembr
     tty: true
     ipc: host
@@ -23,6 +23,6 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [gpu, utility, compute, graphics]
     profiles:
       - gpu
