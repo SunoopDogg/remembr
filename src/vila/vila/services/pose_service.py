@@ -32,6 +32,7 @@ class PoseService:
         pose: PoseData,
         timestamp: Time,
         image_count: int,
+        duration: float = 0.0,
     ) -> CaptionWithPose:
         """Build CaptionWithPose message from components."""
         msg = CaptionWithPose()
@@ -42,6 +43,7 @@ class PoseService:
         msg.theta = pose.theta
         msg.timestamp = timestamp
         msg.image_count = image_count
+        msg.duration = duration
         return msg
 
     @staticmethod

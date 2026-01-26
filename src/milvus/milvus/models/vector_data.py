@@ -39,7 +39,7 @@ class VectorData:
             caption_data.position_z
         ]
 
-        timestamp_seconds = float(caption_data.timestamp_sec)
+        timestamp_seconds = float(caption_data.timestamp_sec) + (caption_data.timestamp_nanosec * 1e-9)
         time_vector = [
             timestamp_seconds - FIXED_SUBTRACT,
             0.0

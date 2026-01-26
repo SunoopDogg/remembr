@@ -15,6 +15,7 @@ class CaptionData:
     timestamp_sec: int
     timestamp_nanosec: int
     image_count: int
+    duration: float
 
     @classmethod
     def from_ros_msg(cls, msg: CaptionWithPose) -> 'CaptionData':
@@ -27,7 +28,8 @@ class CaptionData:
             theta=float(msg.theta),
             timestamp_sec=int(msg.timestamp.sec),
             timestamp_nanosec=int(msg.timestamp.nanosec),
-            image_count=int(msg.image_count)
+            image_count=int(msg.image_count),
+            duration=float(msg.duration)
         )
 
     def __post_init__(self) -> None:

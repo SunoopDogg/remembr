@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "remembr[vila]",
     "remembr[milvus]",
+    "remembr[agent]",
     "setuptools>=80.10.1",
 ]
 
@@ -30,6 +31,12 @@ milvus = [
     "langchain-huggingface>=1.2.0",
     "pymilvus[milvus-lite]>=2.6.6",
     "sentence-transformers>=5.2.0",
+]
+
+agent = [
+    "langchain-ollama>=1.0.1",
+    "langgraph>=1.0.7",
+    "pydantic>=2.12.5",
 ]
 
 [tool.uv.extra-build-dependencies]

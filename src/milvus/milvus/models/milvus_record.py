@@ -15,6 +15,7 @@ class MilvusMemoryRecord:
     position: list[float]
     theta: float
     time: list[float]
+    duration: float
 
     @classmethod
     def from_caption_and_vectors(
@@ -29,7 +30,8 @@ class MilvusMemoryRecord:
             caption_embedding=vector_data.caption_embedding,
             position=vector_data.position_vector,
             theta=vector_data.theta,
-            time=vector_data.time_vector
+            time=vector_data.time_vector,
+            duration=caption_data.duration
         )
 
     def to_dict(self) -> dict:
@@ -40,7 +42,8 @@ class MilvusMemoryRecord:
             "caption_embedding": self.caption_embedding,
             "position": self.position,
             "theta": self.theta,
-            "time": self.time
+            "time": self.time,
+            "duration": self.duration
         }
 
     def __post_init__(self) -> None:

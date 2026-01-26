@@ -5,7 +5,7 @@ import cv2
 from cv_bridge import CvBridge
 from PIL import Image
 
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, Image as RosImage
 
 from ..utils.timestamp_utils import ros_time_to_float
 
@@ -28,14 +28,24 @@ class ImageService:
         self._buffer: List[Tuple[Image.Image, float]] = []
         self._lock = threading.Lock()
 
-    def convert_ros_to_pil(self, msg: CompressedImage) -> Image.Image:
+    def convert_compressed_to_pil(self, msg: CompressedImage) -> Image.Image:
         """Convert ROS CompressedImage to PIL Image."""
         cv_image = self._bridge.compressed_imgmsg_to_cv2(msg)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_image_rgb)
 
-    def get_timestamp(self, msg: CompressedImage) -> float:
-        """Extract timestamp from ROS message as float."""
+    def convert_raw_to_pil(self, msg: RosImage) -> Image.Image:
+        """Convert ROS Image to PIL Image."""
+        cv_image = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(cv_image_rgb)
+
+    def get_compressed_timestamp(self, msg: CompressedImage) -> float:
+        """Extract timestamp from ROS CompressedImage message as float."""
+        return ros_time_to_float(msg.header.stamp)
+
+    def get_raw_timestamp(self, msg: RosImage) -> float:
+        """Extract timestamp from ROS Image message as float."""
         return ros_time_to_float(msg.header.stamp)
 
     def add_to_buffer(self, image: Image.Image, timestamp: float) -> bool:
