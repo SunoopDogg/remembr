@@ -1,6 +1,8 @@
 import os
 import sys
 
+from .utils.protocols import Logger
+
 
 def _setup_llava_import_path() -> None:
     """Add vila package dir to sys.path for Hydra 'llava.*' imports."""
@@ -10,3 +12,5 @@ def _setup_llava_import_path() -> None:
 
 
 _setup_llava_import_path()
+
+__all__ = ['Logger']
