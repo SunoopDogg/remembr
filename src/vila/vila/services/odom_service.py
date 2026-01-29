@@ -1,17 +1,10 @@
 import threading
-from typing import List, Tuple, Optional, Protocol
+from typing import List, Tuple, Optional
 
 from nav_msgs.msg import Odometry
 
 from ..models.pose_data import PoseData
-
-
-class Logger(Protocol):
-    """Protocol for ROS2-compatible logger."""
-
-    def info(self, msg: str) -> None: ...
-    def warn(self, msg: str) -> None: ...
-    def error(self, msg: str) -> None: ...
+from ..utils.protocols import Logger
 
 
 class OdomService:
@@ -52,19 +45,8 @@ class OdomService:
             self._buffer.clear()
             return buffer_copy
 
-    def get_buffer_copy(self) -> List[Tuple[float, float, float, float]]:
-        """Get a copy of the current buffer without clearing."""
-        with self._lock:
-            return self._buffer.copy()
-
     @property
     def last_pose(self) -> Optional[PoseData]:
         """Get last known pose as fallback."""
         with self._lock:
             return self._last_pose
-
-    @property
-    def buffer_size(self) -> int:
-        """Current buffer size."""
-        with self._lock:
-            return len(self._buffer)

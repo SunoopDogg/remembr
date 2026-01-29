@@ -1,5 +1,5 @@
 import threading
-from typing import List, Tuple, Protocol
+from typing import List, Tuple
 
 import cv2
 from cv_bridge import CvBridge
@@ -7,15 +7,8 @@ from PIL import Image
 
 from sensor_msgs.msg import CompressedImage, Image as RosImage
 
+from ..utils.protocols import Logger
 from ..utils.timestamp_utils import ros_time_to_float
-
-
-class Logger(Protocol):
-    """Protocol for ROS2-compatible logger."""
-
-    def info(self, msg: str) -> None: ...
-    def warn(self, msg: str) -> None: ...
-    def error(self, msg: str) -> None: ...
 
 
 class ImageService:
@@ -60,23 +53,13 @@ class ImageService:
             return was_full
 
     def flush_buffer(self) -> Tuple[List[Image.Image], List[float]]:
-        """Extract and clear buffer contents, returning separate lists."""
+        """Flush buffer and return all images with timestamps."""
         with self._lock:
-            images = [img for img, _ in self._buffer]
-            timestamps = [ts for _, ts in self._buffer]
+            if not self._buffer:
+                return [], []
+            images, timestamps = zip(*self._buffer)
             self._buffer.clear()
-            return images, timestamps
-
-    def get_buffer_copy(self) -> List[Tuple[Image.Image, float]]:
-        """Get a copy of the current buffer without clearing."""
-        with self._lock:
-            return self._buffer.copy()
-
-    @property
-    def buffer_size(self) -> int:
-        """Current buffer size."""
-        with self._lock:
-            return len(self._buffer)
+            return list(images), list(timestamps)
 
     @property
     def is_empty(self) -> bool:
