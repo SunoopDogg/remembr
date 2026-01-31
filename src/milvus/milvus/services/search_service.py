@@ -1,23 +1,18 @@
 import datetime
 import time
 from time import localtime, strftime
-from typing import Protocol, Tuple
+from typing import Tuple
 
 from .milvus_service import MilvusService
 from .embedding_service import EmbeddingService
 from ..config import FIXED_SUBTRACT
-
-
-class Logger(Protocol):
-    """Protocol for ROS2-compatible logger."""
-
-    def info(self, msg: str) -> None: ...
-    def warn(self, msg: str) -> None: ...
-    def error(self, msg: str) -> None: ...
+from ..utils.protocols import Logger
 
 
 class SearchService:
     """Vector similarity search service."""
+
+    OUTPUT_FIELDS = ["caption", "position", "theta", "time"]
 
     def __init__(
         self,
@@ -37,12 +32,12 @@ class SearchService:
             results = self.milvus_service.client.search(
                 collection_name=self.milvus_service.config.collection_name,
                 data=[query_embedding],
-                anns_field="caption_embedding",
+                anns_field="text_embedding",
                 limit=limit,
-                output_fields=["caption_text", "position", "theta", "time", "duration"]
+                output_fields=self.OUTPUT_FIELDS,
             )
 
-            return self._process_results(results)
+            return self._process_search_results(results)
 
         except Exception as e:
             self.logger.error(f'Error in search_by_text: {e}')
@@ -61,10 +56,10 @@ class SearchService:
                 data=[position_vec],
                 anns_field="position",
                 limit=limit,
-                output_fields=["caption_text", "position", "theta", "time", "duration"]
+                output_fields=self.OUTPUT_FIELDS,
             )
 
-            return self._process_results(results)
+            return self._process_search_results(results)
 
         except ValueError:
             raise
@@ -72,44 +67,22 @@ class SearchService:
             self.logger.error(f'Error in search_by_position: {e}')
             return []
 
-    def search_by_time(self, time_str: str, limit: int = 5) -> list[dict]:
-        """Search memories by time in HH:MM:SS format."""
+    def search_by_time(self, time_str: str, limit: int = 5, **kwargs) -> list[dict]:
+        """Search memories by time using vector similarity."""
         try:
             time_str = time_str.strip()
-
-            # Get date from FIXED_SUBTRACT (same logic as remembr)
-            t = localtime(FIXED_SUBTRACT)
-            mdy_date = strftime('%m/%d/%Y', t)
-            template = "%m/%d/%Y %H:%M:%S"
-
-            # Check if already in full datetime format
-            try:
-                datetime.datetime.strptime(time_str, template)
-                full_datetime = time_str
-            except ValueError:
-                # Assume HH:MM:SS format, add date
-                time_parts = time_str.split(':')
-                if len(time_parts) != 3:
-                    raise ValueError(f"Time must be HH:MM:SS format, got {time_str}")
-                full_datetime = mdy_date + ' ' + time_str
-
-            # Convert to timestamp and subtract offset (remembr-compatible)
-            query_timestamp = time.mktime(
-                datetime.datetime.strptime(full_datetime, template).timetuple()
-            ) - FIXED_SUBTRACT
-
-            # Time vector format: [(timestamp - FIXED_SUBTRACT), 0.0]
-            time_vec = [query_timestamp, 0.0]
+            query_timestamp = self._parse_time_string(time_str)
+            time_vector = [query_timestamp, 0.0]
 
             results = self.milvus_service.client.search(
                 collection_name=self.milvus_service.config.collection_name,
-                data=[time_vec],
+                data=[time_vector],
                 anns_field="time",
                 limit=limit,
-                output_fields=["caption_text", "position", "theta", "time", "duration"]
+                output_fields=self.OUTPUT_FIELDS,
             )
 
-            return self._process_results(results)
+            return self._process_search_results(results)
 
         except ValueError:
             raise
@@ -117,18 +90,42 @@ class SearchService:
             self.logger.error(f'Error in search_by_time: {e}')
             return []
 
-    def _process_results(self, results) -> list[dict]:
-        """Process Milvus search results into standardized format."""
+    def _parse_time_string(self, time_str: str) -> float:
+        """Parse time string and return normalized timestamp."""
+        t = localtime(FIXED_SUBTRACT)
+        mdy_date = strftime('%m/%d/%Y', t)
+        template = "%m/%d/%Y %H:%M:%S"
+
+        try:
+            datetime.datetime.strptime(time_str, template)
+            full_datetime = time_str
+        except ValueError:
+            time_parts = time_str.split(':')
+            if len(time_parts) != 3:
+                raise ValueError(f"Time must be HH:MM:SS format, got {time_str}")
+            full_datetime = mdy_date + ' ' + time_str
+
+        actual_timestamp = time.mktime(
+            datetime.datetime.strptime(full_datetime, template).timetuple()
+        )
+        return actual_timestamp - FIXED_SUBTRACT
+
+    def _process_search_results(self, results) -> list[dict]:
+        """Process Milvus vector search results."""
         processed = []
         if results and len(results) > 0:
             for hit in results[0]:
+                entity = hit.get('entity', {})
+                time_value = entity.get('time', [0.0, 0.0])
+                if isinstance(time_value, list) and len(time_value) >= 1:
+                    time_value = time_value[0]
+
                 processed.append({
-                    'caption_text': hit.get('entity', {}).get('caption_text', ''),
-                    'position': hit.get('entity', {}).get('position', [0.0, 0.0, 0.0]),
-                    'theta': hit.get('entity', {}).get('theta', 0.0),
-                    'time': hit.get('entity', {}).get('time', [0.0, 0.0]),
-                    'duration': hit.get('entity', {}).get('duration', 0.0),
-                    'distance': hit.get('distance', 0.0)
+                    'text': entity.get('caption', ''),
+                    'position': entity.get('position', [0.0, 0.0, 0.0]),
+                    'orientation': entity.get('theta', 0.0),
+                    'time': time_value,
+                    'distance': hit.get('distance', 0.0),
                 })
         return processed
 
@@ -139,27 +136,20 @@ class SearchService:
 
         output = ""
         for doc in results:
-            time_vec = doc.get('time', [0.0, 0.0])
-
-            # Convert from remembr format: time_vec[0] = (timestamp - FIXED_SUBTRACT)
-            # Add FIXED_SUBTRACT back to get actual timestamp
-            if len(time_vec) >= 1:
-                actual_timestamp = time_vec[0] + FIXED_SUBTRACT
-                t = localtime(actual_timestamp)
-                time_str = strftime('%Y-%m-%d %H:%M:%S', t)
-            else:
-                time_str = "unknown"
+            timestamp = doc.get('time', 0.0)
+            actual_timestamp = timestamp + FIXED_SUBTRACT
+            t = localtime(actual_timestamp)
+            time_str = strftime('%Y-%m-%d %H:%M:%S', t)
 
             position = doc.get('position', [0.0, 0.0, 0.0])
-            theta = doc.get('theta', 0.0)
-            duration = doc.get('duration', 0.0)
-            caption = doc.get('caption_text', '')
+            orientation = doc.get('orientation', 0.0)
+            text = doc.get('text', '')
 
             output += (
                 f"At time={time_str}, the robot was at an average position of "
-                f"{[round(p, 3) for p in position]} facing theta={round(theta, 3)} rad "
-                f"for {round(duration, 1)}s. "
-                f"The robot saw the following: {caption}\n\n"
+                f"{[round(p, 3) for p in position]} with an average orientation of "
+                f"{round(orientation, 3)} radians."
+                f"The robot saw the following: {text}\n\n"
             )
 
         return output.strip()
