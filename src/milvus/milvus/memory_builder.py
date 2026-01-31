@@ -22,24 +22,25 @@ class MemoryBuilder(Node):
 
         self.caption_count = 0
 
-        # Load configuration from ROS2 parameters
         self._config = DatabaseConfig.from_ros_node(self)
         self._config.validate()
         self._config.ensure_db_dir()
-        self.get_logger().info(f'Database path: {self._config.db_path}')
 
-        # Initialize services
-        self._milvus_service = MilvusService(self._config, self.get_logger())
+        self.get_logger().info(f'Database path: {self._config.db_path}')
+        self.get_logger().info(f'Embedding model: {self._config.embedding_model}')
+        self.get_logger().info(f'Collection: {self._config.collection_name}')
+
         self._embedding_service = EmbeddingService(
             self._config.embedding_model,
             self.get_logger(),
+            expected_dim=self._config.embedding_dim,
         )
-        self._data_pipeline = DataPipeline(self._embedding_service)
+        self._milvus_service = None
+        self._data_pipeline = None
         self._search_service = None
 
         self._initialize_services(reset_db)
 
-        # Subscribe to caption with pose topic
         self._caption_subscription = self.create_subscription(
             CaptionWithPose,
             self._config.input_topic,
@@ -60,6 +61,14 @@ class MemoryBuilder(Node):
     def _initialize_services(self, reset_db: bool) -> None:
         """Initialize all services."""
         try:
+            self._embedding_service.load_model()
+            embedding_dim = self._embedding_service.embedding_dimension
+
+            self._milvus_service = MilvusService(
+                self._config,
+                self.get_logger(),
+                embedding_dim=embedding_dim,
+            )
             self._milvus_service.connect()
 
             if reset_db:
@@ -68,9 +77,10 @@ class MemoryBuilder(Node):
                 self._milvus_service.setup_collection()
 
             self.get_logger().info(
-                f'Milvus collection "{self._config.collection_name}" ready')
+                f'Milvus collection "{self._config.collection_name}" ready '
+                f'(embedding_dim={embedding_dim})')
 
-            self._embedding_service.load_model()
+            self._data_pipeline = DataPipeline(self._embedding_service)
 
             self._search_service = SearchService(
                 self._milvus_service,
@@ -115,7 +125,7 @@ class MemoryBuilder(Node):
             result = self._milvus_service.insert_record(record)
 
             self.get_logger().info(
-                f'Stored to Milvus: "{record.caption_text[:50]}..." '
+                f'Stored to Milvus: "{record.caption[:50]}..." '
                 f'(ID: {result["ids"][0] if result.get("ids") else "N/A"})'
             )
 
@@ -144,10 +154,12 @@ class MemoryBuilder(Node):
             self.get_logger().error(f'Error in search_by_position: {e}')
             return f"Error searching by position: {str(e)}"
 
-    def search_by_time(self, time_str: str) -> str:
+    def search_by_time(self, time_str: str, time_window: Optional[float] = None) -> str:
         """Search memories by time in HH:MM:SS format."""
         try:
-            results = self._search_service.search_by_time(time_str, limit=5)
+            results = self._search_service.search_by_time(
+                time_str, limit=5, time_window=time_window
+            )
             return self._search_service.format_results(results, f"time: {time_str}")
 
         except ValueError as e:
@@ -160,21 +172,21 @@ class MemoryBuilder(Node):
         """Clean up resources before node shutdown."""
         self.get_logger().info('Cleaning up resources...')
 
-        if hasattr(self, '_milvus_service'):
+        if self._milvus_service is not None:
             try:
                 self._milvus_service.close()
                 self.get_logger().info('Milvus service closed')
             except Exception as e:
                 self.get_logger().warning(f'Error closing Milvus service: {e}')
 
-        if hasattr(self, '_embedding_service'):
+        if self._embedding_service is not None:
             try:
                 self._embedding_service.cleanup()
                 self.get_logger().info('Embedding service cleaned up')
             except Exception as e:
                 self.get_logger().warning(f'Error cleaning up embedding service: {e}')
 
-        if hasattr(self, '_data_pipeline'):
+        if self._data_pipeline is not None:
             del self._data_pipeline
 
         super().destroy_node()
@@ -185,7 +197,7 @@ def main(args: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(
         description='Memory Builder Node - Stores robot captions in Milvus')
     parser.add_argument('--reset', action='store_true',
-                        help='Reset database on startup')
+                        help='Reset collection for current embedding model')
 
     if args is None:
         args = sys.argv[1:]
