@@ -18,12 +18,7 @@ class DataPipeline:
 
         vector_data = VectorData.from_caption_data(
             caption_data,
-            self.embedding_service.model
+            self.embedding_service.model,
         )
 
-        record = MilvusMemoryRecord.from_caption_and_vectors(
-            caption_data,
-            vector_data
-        )
-
-        return record
+        return MilvusMemoryRecord.from_caption_and_vectors(caption_data, vector_data)

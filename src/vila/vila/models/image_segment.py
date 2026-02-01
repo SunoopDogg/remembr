@@ -35,8 +35,3 @@ class ImageSegment:
     def time_range(self) -> Tuple[float, float]:
         """Return (start_time, end_time) of the segment."""
         return (self.timestamps[0], self.timestamps[-1])
-
-    @property
-    def duration(self) -> float:
-        """Duration of the segment in seconds."""
-        return self.timestamps[-1] - self.timestamps[0]

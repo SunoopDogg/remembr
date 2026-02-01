@@ -13,17 +13,9 @@ class PoseService:
     """Pose calculation and message building service."""
 
     @staticmethod
-    def calculate_average_pose(
-        odom_buffer: List[Tuple[float, float, float, float]],
-    ) -> PoseData:
-        """Calculate average pose from odometry buffer."""
-        return PoseData.from_odom_buffer(odom_buffer)
-
-    @staticmethod
     def calculate_median_timestamp(timestamps: List[float]) -> Time:
-        """Calculate median timestamp from list of float timestamps."""
-        sorted_times = sorted(timestamps)
-        median_float = statistics.median(sorted_times)
+        """Calculate median timestamp from list of timestamps."""
+        median_float = statistics.median(timestamps)
         return float_to_ros_time(median_float)
 
     @staticmethod

@@ -33,3 +33,15 @@ class AgentOutput:
             time=d.get('time'),
             duration=d.get('duration')
         )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            'type': self.type,
+            'text': self.text,
+            'binary': self.binary,
+            'position': self.position,
+            'orientation': self.orientation,
+            'time': self.time,
+            'duration': self.duration,
+        }

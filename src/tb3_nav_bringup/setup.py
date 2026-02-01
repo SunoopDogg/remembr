@@ -43,7 +43,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'query_navigator = tb3_nav_bringup.query_navigator:main',
+            'waypoint_patrol = tb3_nav_bringup.waypoint_patrol:main',
         ],
     },
 )

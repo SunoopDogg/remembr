@@ -49,7 +49,7 @@ class Captioner(Node):
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
         # Timing state for segment tracking
-        self._start_time: Optional[float] = None
+        self._segment_start_time: Optional[float] = None
 
     def _setup_subscribers(self) -> None:
         """Configure ROS2 subscribers."""
@@ -110,8 +110,8 @@ class Captioner(Node):
     def _process_image(self, pil_image, current_time: float) -> None:
         """Common image processing logic for both compressed and raw images."""
         # Initialize start time on first image
-        if self._start_time is None:
-            self._start_time = current_time
+        if self._segment_start_time is None:
+            self._segment_start_time = current_time
             self.get_logger().info("First image received, starting timing")
 
         # Buffer size management with warning
@@ -121,9 +121,9 @@ class Captioner(Node):
             )
 
         # Check if segment time has elapsed
-        if current_time - self._start_time >= self._config.segment_time:
+        if current_time - self._segment_start_time >= self._config.segment_time:
             self._submit_segment_for_processing()
-            self._start_time = current_time
+            self._segment_start_time = current_time
 
     def _odom_callback(self, msg: Odometry) -> None:
         """Process incoming odometry messages."""

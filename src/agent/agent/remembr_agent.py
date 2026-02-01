@@ -1,18 +1,20 @@
 import json
+import math
 import traceback
-from typing import List, Optional
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from milvus.config import DatabaseConfig
-from milvus.services import MilvusService, EmbeddingService, SearchService
 from agent_msgs.srv import Query
 
 from .config import AgentConfig
 from .services import ReMEmbRAgent
+from .services.service_factory import create_services, cleanup_services
 
 
 class ReMEmbRAgentNode(Node):
@@ -49,41 +51,30 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().error(f'{context}: {error}')
         self.get_logger().error(traceback.format_exc())
         if reraise:
-            raise
+            raise error
 
     def _initialize_services(self) -> None:
         """Initialize all services."""
         try:
-            # Initialize Milvus
-            self._milvus_service = MilvusService(self._db_config, self.get_logger())
-            self._milvus_service.connect()
-            self._milvus_service.setup_collection()
-            self.get_logger().info(
-                f'Milvus collection "{self._db_config.collection_name}" ready')
-
-            # Initialize embedding service
-            self._embedding_service = EmbeddingService(
-                self._db_config.embedding_model,
-                self.get_logger(),
+            self._milvus_service, self._embedding_service, self._search_service = (
+                create_services(self._db_config, self.get_logger())
             )
-            self._embedding_service.load_model()
-            self.get_logger().info('Embedding service ready')
 
-            # Initialize search service
-            self._search_service = SearchService(
-                self._milvus_service,
-                self._embedding_service,
-                self.get_logger(),
-            )
-            self.get_logger().info('Search service ready')
-
-            # Initialize agent
             self._agent = ReMEmbRAgent(self._config, self.get_logger())
             self._agent.set_search_service(self._search_service)
             self.get_logger().info('Agent ready')
 
         except Exception as e:
+            self._cleanup_services()
             self._log_error('Service initialization failed', e)
+
+    def _cleanup_services(self) -> None:
+        """Clean up any partially initialized services."""
+        cleanup_services(self._milvus_service, self._embedding_service)
+        self._milvus_service = None
+        self._embedding_service = None
+        self._search_service = None
+        self._agent = None
 
     def _setup_ros_interfaces(self) -> None:
         """Setup ROS2 service and topic interfaces."""
@@ -118,7 +109,15 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().info(f'Query topic: {self.get_name()}/query_topic')
         self.get_logger().info(f'Response topic: {self.get_name()}/response_topic')
 
-    def _status_callback(self, request, response):
+        # Goal pose publisher for navigation
+        self._goal_pose_publisher = self.create_publisher(
+            PoseStamped,
+            '/goal_pose',
+            10,
+        )
+        self.get_logger().info('Goal pose publisher: /goal_pose')
+
+    def _status_callback(self, _request, response):
         """Handle status service request."""
         response.success = self._agent is not None
         response.message = (
@@ -138,7 +137,6 @@ class ReMEmbRAgentNode(Node):
         response.position = list(result.get('position') or [])
         response.orientation = float(result.get('orientation') or 0.0)
         response.time = float(result.get('time') or 0.0)
-        response.duration = float(result.get('duration') or 0.0)
         response.error = result.get('error', '')
 
         return response
@@ -169,41 +167,48 @@ class ReMEmbRAgentNode(Node):
                 f'"{result.text[:30] if result.text else "N/A"}..."'
             )
 
-            return {
-                'type': result.type,
-                'text': result.text,
-                'binary': result.binary,
-                'position': result.position,
-                'orientation': result.orientation,
-                'time': result.time,
-                'duration': result.duration,
-            }
+            result_dict = result.to_dict()
+
+            self._publish_goal_pose(result)
+
+            return result_dict
 
         except Exception as e:
             self._log_error(f'Query #{self._query_count} failed', e, reraise=False)
             return {'error': str(e)}
 
+    def _publish_goal_pose(self, result) -> None:
+        """Publish goal pose to /goal_pose if the result contains a valid position."""
+        if not result.position or len(result.position) < 2:
+            return
+
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.header.stamp = self.get_clock().now().to_msg()
+
+        goal.pose.position.x = float(result.position[0])
+        goal.pose.position.y = float(result.position[1])
+        goal.pose.position.z = float(result.position[2]) if len(result.position) > 2 else 0.0
+
+        # Convert yaw (euler Z) to quaternion
+        yaw = float(result.orientation) if result.orientation is not None else 0.0
+        goal.pose.orientation.z = math.sin(yaw / 2.0)
+        goal.pose.orientation.w = math.cos(yaw / 2.0)
+
+        self._goal_pose_publisher.publish(goal)
+        self.get_logger().info(
+            f'Published goal pose: x={goal.pose.position.x:.2f}, '
+            f'y={goal.pose.position.y:.2f}, yaw={yaw:.2f}'
+        )
+
     def destroy_node(self) -> None:
         """Clean up resources before node shutdown."""
         self.get_logger().info('Cleaning up resources...')
-
-        cleanup_tasks = [
-            (self._milvus_service, 'close', 'Milvus service'),
-            (self._embedding_service, 'cleanup', 'Embedding service'),
-        ]
-
-        for service, method, name in cleanup_tasks:
-            if service:
-                try:
-                    getattr(service, method)()
-                    self.get_logger().info(f'{name} closed')
-                except Exception as e:
-                    self.get_logger().warning(f'Error closing {name}: {e}')
-
+        self._cleanup_services()
         super().destroy_node()
 
 
-def main(args: Optional[List[str]] = None) -> None:
+def main(args: Optional[list[str]] = None) -> None:
     """Main entry point for the remembr_agent node."""
     rclpy.init(args=args)
 

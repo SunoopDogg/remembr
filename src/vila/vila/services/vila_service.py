@@ -1,5 +1,5 @@
 import os
-from typing import List, Protocol
+from typing import List
 
 from PIL import Image
 from transformers import GenerationConfig
@@ -8,14 +8,7 @@ from vila import llava
 from vila.llava import conversation as clib
 from vila.llava.utils.logging import logger as vila_logger
 
-
-class Logger(Protocol):
-    """Protocol for ROS2-compatible logger."""
-
-    def info(self, msg: str) -> None: ...
-    def warn(self, msg: str) -> None: ...
-    def error(self, msg: str) -> None: ...
-    def fatal(self, msg: str) -> None: ...
+from ..utils.protocols import Logger
 
 
 class VilaService:
@@ -144,7 +137,3 @@ class VilaService:
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
         return self._model is not None
-
-    def cleanup(self) -> None:
-        """Release model resources."""
-        self._model = None
