@@ -39,12 +39,12 @@ Context: empty
 [{{
     "context_reasoning": "I currently do not have any context, so I must find information that can help the user go upstairs. Two ways to go upstairs can be using stairs or an elevator.", "tool_reasoning": "Since there are two objects, I will search for stairs in this query", 
     "tool": "retrieve_from_text", 
-    "tool_input": {{"x": "staircases"}}}}, 
+    "tool_input": {{"query": "staircases"}}}},
 {{
     "context_reasoning": "As stated above, the two ways to go upstairs is using stairs or an elevator", 
     "tool_reasoning": "Since the previous tool is looking for stairs, this tool will look for an elevator.", 
     "tool": "retrieve_from_text", 
-    "tool_input": {{"x": "elevator"}}
+    "tool_input": {{"query": "elevator"}}
 }}]
 ```
 Output: Retrieved information pertaining to the location of an elevator
