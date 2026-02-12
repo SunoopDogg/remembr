@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from vila_msgs.msg import CaptionWithPose
@@ -31,5 +32,5 @@ class CaptionData:
     def __post_init__(self) -> None:
         if not self.caption.strip():
             raise ValueError("Caption cannot be empty")
-        if not -2 * 3.14159 <= self.theta <= 2 * 3.14159:
+        if not -2 * math.pi <= self.theta <= 2 * math.pi:
             raise ValueError(f"Theta {self.theta} outside valid range")
