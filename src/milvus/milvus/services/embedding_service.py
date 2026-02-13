@@ -25,7 +25,18 @@ class EmbeddingService:
         """Load HuggingFaceEmbeddings model and detect embedding dimension."""
         try:
             self.logger.info(f'Loading {self.model_name} model (HuggingFaceEmbeddings)...')
-            self.model = HuggingFaceEmbeddings(model_name=self.model_name)
+
+            # Get target dimension for MRL-capable models (like jina-embeddings-v3)
+            target_dim = self.expected_dim or EMBEDDING_MODEL_DIMS.get(self.model_name)
+
+            model_kwargs = {'trust_remote_code': True}
+            if target_dim:
+                model_kwargs['truncate_dim'] = target_dim
+
+            self.model = HuggingFaceEmbeddings(
+                model_name=self.model_name,
+                model_kwargs=model_kwargs,
+            )
 
             self._detect_dimension()
 
