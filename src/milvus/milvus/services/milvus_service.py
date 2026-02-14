@@ -14,11 +14,16 @@ class MilvusService:
         self,
         config: DatabaseConfig,
         logger: Logger,
-        embedding_dim: int = 1024,
+        embedding_dim: int | None = None,
     ) -> None:
         self.config = config
         self.logger = logger
-        self.embedding_dim = embedding_dim
+        # Use provided dim, or get from config's known dims, or fallback to 1024
+        self.embedding_dim = (
+            embedding_dim
+            or config.get_known_embedding_dim()
+            or 1024
+        )
         self.client = None
 
     def connect(self) -> None:
@@ -134,6 +139,16 @@ class MilvusService:
             self.logger.error(f'Failed to insert record: {e}')
             self.logger.error(traceback.format_exc())
             raise
+
+    def search(self, data: list, anns_field: str, limit: int) -> list:
+        """Execute vector search on the configured collection."""
+        return self.client.search(
+            collection_name=self.config.collection_name,
+            data=data,
+            anns_field=anns_field,
+            limit=limit,
+            output_fields=["caption", "position", "theta", "time"],
+        )
 
     def has_collection(self) -> bool:
         """Check if collection exists."""
