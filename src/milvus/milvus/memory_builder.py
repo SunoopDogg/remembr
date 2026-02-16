@@ -1,7 +1,7 @@
 import argparse
 import sys
 import traceback
-from typing import Optional, Tuple
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
@@ -132,41 +132,10 @@ class MemoryBuilder(Node):
         except Exception as e:
             self._log_error('Failed to store to Milvus', e, reraise=False)
 
-    def search_by_text(self, query: str) -> str:
-        """Search memories by text using vector similarity."""
-        try:
-            results = self._search_service.search_by_text(query, limit=5)
-            return self._search_service.format_results(results, f"text: '{query}'")
-
-        except Exception as e:
-            self.get_logger().error(f'Error in search_by_text: {e}')
-            return f"Error searching by text: {str(e)}"
-
-    def search_by_position(self, position: Tuple) -> str:
-        """Search memories by spatial position."""
-        try:
-            results = self._search_service.search_by_position(position, limit=5)
-            return self._search_service.format_results(results, f"position: {position}")
-
-        except ValueError as e:
-            return f"Error: {str(e)}"
-        except Exception as e:
-            self.get_logger().error(f'Error in search_by_position: {e}')
-            return f"Error searching by position: {str(e)}"
-
-    def search_by_time(self, time_str: str, time_window: Optional[float] = None) -> str:
-        """Search memories by time in HH:MM:SS format."""
-        try:
-            results = self._search_service.search_by_time(
-                time_str, limit=5, time_window=time_window
-            )
-            return self._search_service.format_results(results, f"time: {time_str}")
-
-        except ValueError as e:
-            return f"Error: {str(e)}"
-        except Exception as e:
-            self.get_logger().error(f'Error in search_by_time: {e}')
-            return f"Error searching by time: {str(e)}"
+    @property
+    def search_service(self) -> SearchService:
+        """Expose SearchService for direct use."""
+        return self._search_service
 
     def destroy_node(self) -> None:
         """Clean up resources before node shutdown."""
