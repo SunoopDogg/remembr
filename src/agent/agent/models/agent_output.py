@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from ..utils.type_utils import safe_float, safe_str
+
 
 @dataclass(frozen=True, slots=True)
 class AgentOutput:
@@ -20,18 +22,23 @@ class AgentOutput:
         # Extract orientation as single float (euler Z angle)
         orientation = d.get('orientation')
         if isinstance(orientation, (list, tuple)) and len(orientation) > 0:
-            orientation = float(orientation[0])
-        elif orientation is not None:
-            orientation = float(orientation)
+            orientation = safe_float(orientation[0])
+        else:
+            orientation = safe_float(orientation)
+
+        # Handle position - normalize 'null' to None
+        position = d.get('position')
+        if position == 'null' or position == '':
+            position = None
 
         return cls(
-            type=d.get('type'),
-            text=d.get('text'),
-            binary=d.get('binary'),
-            position=d.get('position'),
+            type=safe_str(d.get('type')),
+            text=safe_str(d.get('text')),
+            binary=safe_str(d.get('binary')),
+            position=position,
             orientation=orientation,
-            time=d.get('time'),
-            duration=d.get('duration')
+            time=safe_float(d.get('time')),
+            duration=safe_float(d.get('duration')),
         )
 
     def to_dict(self) -> dict:
