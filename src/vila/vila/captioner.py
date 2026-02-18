@@ -49,7 +49,11 @@ class Captioner(Node):
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
         # Timing state for segment tracking
-        self._segment_start_time: Optional[float] = None
+        self._segment_window_start: Optional[float] = None
+
+    def _log_exception(self, context: str, exc: Exception) -> None:
+        self.get_logger().error(f"Error in {context}: {exc}")
+        self.get_logger().error(traceback.format_exc())
 
     def _setup_subscribers(self) -> None:
         """Configure ROS2 subscribers."""
@@ -90,28 +94,26 @@ class Captioner(Node):
         try:
             # Convert ROS image to PIL
             pil_image = self._image_service.convert_compressed_to_pil(msg)
-            current_time = self._image_service.get_compressed_timestamp(msg)
+            current_time = self._image_service.get_timestamp(msg)
             self._process_image(pil_image, current_time)
         except Exception as e:
-            self.get_logger().error(f"Error in compressed_image_callback: {e}")
-            self.get_logger().error(traceback.format_exc())
+            self._log_exception("compressed_image_callback", e)
 
     def _raw_image_callback(self, msg: Image) -> None:
         """Process incoming raw image messages."""
         try:
             # Convert ROS image to PIL
             pil_image = self._image_service.convert_raw_to_pil(msg)
-            current_time = self._image_service.get_raw_timestamp(msg)
+            current_time = self._image_service.get_timestamp(msg)
             self._process_image(pil_image, current_time)
         except Exception as e:
-            self.get_logger().error(f"Error in raw_image_callback: {e}")
-            self.get_logger().error(traceback.format_exc())
+            self._log_exception("raw_image_callback", e)
 
     def _process_image(self, pil_image, current_time: float) -> None:
         """Common image processing logic for both compressed and raw images."""
         # Initialize start time on first image
-        if self._segment_start_time is None:
-            self._segment_start_time = current_time
+        if self._segment_window_start is None:
+            self._segment_window_start = current_time
             self.get_logger().info("First image received, starting timing")
 
         # Buffer size management with warning
@@ -121,9 +123,9 @@ class Captioner(Node):
             )
 
         # Check if segment time has elapsed
-        if current_time - self._segment_start_time >= self._config.segment_time:
+        if current_time - self._segment_window_start >= self._config.segment_time:
             self._submit_segment_for_processing()
-            self._segment_start_time = current_time
+            self._segment_window_start = current_time
 
     def _odom_callback(self, msg: Odometry) -> None:
         """Process incoming odometry messages."""
@@ -131,8 +133,7 @@ class Captioner(Node):
             pose = self._odom_service.process_odom(msg)
             self._odom_service.add_to_buffer(pose)
         except Exception as e:
-            self.get_logger().error(f"Error in odom_callback: {e}")
-            self.get_logger().error(traceback.format_exc())
+            self._log_exception("odom_callback", e)
 
     def _submit_segment_for_processing(self) -> None:
         """Submit current buffers for async processing."""
@@ -156,7 +157,7 @@ class Captioner(Node):
         )
 
         after_time = time.time()
-        self.get_logger().info(
+        self.get_logger().debug(
             f"Segment submission time: {after_time - before_time:.4f} seconds"
         )
 
@@ -228,8 +229,7 @@ class Captioner(Node):
             self._caption_pose_pub.publish(msg)
 
         except Exception as e:
-            self.get_logger().error(f"Error during VILA inference: {e}")
-            self.get_logger().error(traceback.format_exc())
+            self._log_exception("VILA inference", e)
 
     def destroy_node(self) -> None:
         """Clean up resources before node shutdown."""
@@ -238,7 +238,7 @@ class Captioner(Node):
             self._executor.shutdown(wait=True, cancel_futures=False)
             self.get_logger().info("ThreadPoolExecutor shutdown complete")
         except Exception as e:
-            self.get_logger().error(f"Error during executor shutdown: {e}")
+            self._log_exception("executor shutdown", e)
         finally:
             super().destroy_node()
 
