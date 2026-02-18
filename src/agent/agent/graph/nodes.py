@@ -2,7 +2,7 @@ import ast
 import json
 import re
 import sys
-import time as time_module
+import time
 import traceback
 
 from langchain_core.messages import AIMessage, ToolMessage
@@ -12,44 +12,57 @@ from ..config import AgentConfig
 from ..models import AgentState
 from ..utils import parse_json
 
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 1.0
-
 _ARGS_CLEANUP_PATTERN = re.compile(r"\{.*?\}")
 
 
-def _retry_node_on_failure(state, func, logger=None, max_retries=MAX_RETRIES):
-    """Retry a function on failure with backoff and max retries."""
+MAX_NODE_RETRIES = 5
+NODE_RETRY_DELAY = 1.0
+
+
+def _retry_node_on_failure(state, func, logger=None, max_retries=MAX_NODE_RETRIES):
+    """Retry a function on failure with exponential backoff."""
+    last_error = None
     for attempt in range(max_retries):
         try:
             return func(state)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as e:
+            last_error = e
             if logger:
                 logger(f"Node {func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}")
+            print(f"Node {func.__name__} crashed (attempt {attempt + 1}/{max_retries}), retrying...")
+            print(f"Error: {e}")
+            traceback.print_exc()
+
+            # Exponential backoff before retry
             if attempt < max_retries - 1:
-                delay = RETRY_BASE_DELAY * (2 ** attempt)
-                time_module.sleep(delay)
-            else:
-                raise
+                delay = NODE_RETRY_DELAY * (2 ** attempt)
+                print(f"Waiting {delay:.1f}s before retry...")
+                time.sleep(delay)
+
+    # All retries exhausted
+    raise RuntimeError(
+        f"Node {func.__name__} failed after {max_retries} attempts. "
+        f"Last error: {last_error}"
+    ) from last_error
 
 
 class GraphNodes:
     """Encapsulates LangGraph node logic and shared state."""
 
-    def __init__(self, llm, config: AgentConfig, prompts: dict, tool_definitions: list, base_llm=None) -> None:
+    def __init__(self, llm, config: AgentConfig, prompts: dict, tools: list) -> None:
         self.llm = llm
-        self.base_llm = base_llm or llm
         self.config = config
         self.prompts = prompts
-        self.tool_definitions = tool_definitions
+        # Store tools for native bind_tools() (StructuredTool objects)
+        self.tools = tools
         self.reset_state()
 
     def reset_state(self) -> None:
         """Reset mutable state for a new query."""
-        self._tool_history_items: list = []
-        self.iteration_count = 0
+        self._tool_history_items: list[str] = []
+        self.iteration_count: int = 0
         self.last_parsed_result: dict | None = None
 
     def _get_tool_history(self) -> str:
@@ -75,7 +88,8 @@ class GraphNodes:
         messages = state["messages"]
 
         if self.iteration_count < self.config.max_tool_calls:
-            model = self.llm.bind_tools(tools=self.tool_definitions)
+            # Use native Ollama tool binding instead of FunctionsWrapper
+            model = self.llm.bind_tools(tools=self.tools)
             prompt = self.prompts["agent"]
         else:
             model = self.llm
@@ -131,7 +145,7 @@ class GraphNodes:
             ("human", "{question}"),
         ])
 
-        chain = gen_prompt | self.base_llm
+        chain = gen_prompt | self.llm
         response = chain.invoke({"question": question, "chat_history": messages[1:]})
 
         # Strip newlines before parsing, matching reference behavior
@@ -160,10 +174,24 @@ class GraphNodes:
             if key not in data:
                 raise ValueError(f"Missing required key: {key}")
 
-        if isinstance(data.get('position'), str):
-            data['position'] = ast.literal_eval(data['position'])
-        if isinstance(data.get('orientation'), str):
-            data['orientation'] = ast.literal_eval(data['orientation'])
+        # Normalize string 'null' to Python None for all fields
+        for key in data:
+            if data[key] == 'null' or data[key] == 'None':
+                data[key] = None
+
+        # Parse position from string if needed
+        if isinstance(data.get('position'), str) and data['position']:
+            try:
+                data['position'] = ast.literal_eval(data['position'])
+            except (ValueError, SyntaxError):
+                data['position'] = None
+
+        # Parse orientation from string if needed
+        if isinstance(data.get('orientation'), str) and data['orientation']:
+            try:
+                data['orientation'] = ast.literal_eval(data['orientation'])
+            except (ValueError, SyntaxError):
+                data['orientation'] = None
 
         if data['position'] is not None and len(data['position']) != 3:
             raise ValueError(f"Invalid position shape: {data['position']}")

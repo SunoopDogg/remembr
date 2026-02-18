@@ -9,7 +9,6 @@ from ..models.protocols import Logger, SearchService
 from ..tools import create_search_tools
 from ..graph import GraphNodes, build_agent_graph
 from ..utils import file_to_string
-from .functions_wrapper import FunctionsWrapper
 
 
 @lru_cache(maxsize=1)
@@ -29,16 +28,14 @@ class ReMEmbRAgent:
         self.config = config
         self.logger = logger
 
-        # Initialize LLM with FunctionsWrapper for consistent tool calling.
-        # FunctionsWrapper injects tool definitions into the system prompt
-        # and parses JSON output, matching the reference remembr behavior.
-        self.base_llm = ChatOllama(
+        # Initialize LLM directly without FunctionsWrapper.
+        # Use Ollama's native tool calling via bind_tools() instead of
+        # system prompt injection, which is more reliable with this model.
+        self.llm = ChatOllama(
             model=self.config.model,
-            format="json",
             temperature=self.config.temperature,
             num_ctx=self.config.num_ctx,
         )
-        self.llm = FunctionsWrapper(self.base_llm)
 
         # Load prompts (cached)
         self.prompts = _load_prompts()
@@ -50,8 +47,8 @@ class ReMEmbRAgent:
 
     def set_search_service(self, search_service: SearchService) -> None:
         """Bind a search service and build the agent graph."""
-        tools, tool_definitions = create_search_tools(search_service)
-        self._nodes = GraphNodes(self.llm, self.config, self.prompts, tool_definitions, base_llm=self.base_llm)
+        tools = create_search_tools(search_service)
+        self._nodes = GraphNodes(self.llm, self.config, self.prompts, tools)
         self.graph = build_agent_graph(self._nodes, tools)
 
         self.logger.info('Search service connected, agent graph built')

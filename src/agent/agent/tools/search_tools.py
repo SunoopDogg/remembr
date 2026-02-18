@@ -1,5 +1,4 @@
 from langchain_core.tools import StructuredTool
-from langchain_core.utils.function_calling import convert_to_openai_function
 from pydantic import BaseModel, Field
 
 from ..models.protocols import SearchService
@@ -24,7 +23,7 @@ class TimeSearchInput(BaseModel):
 
 def create_search_tools(
     search_service: SearchService,
-) -> tuple[list[StructuredTool], list[dict]]:
+) -> list[StructuredTool]:
     """Create search tools bound to a SearchService instance."""
     text_search_tool = StructuredTool.from_function(
         func=lambda query: search_service.format_results(
@@ -53,7 +52,4 @@ def create_search_tools(
         args_schema=TimeSearchInput,
     )
 
-    tools = [text_search_tool, position_search_tool, time_search_tool]
-    tool_definitions = [convert_to_openai_function(t) for t in tools]
-
-    return tools, tool_definitions
+    return [text_search_tool, position_search_tool, time_search_tool]
