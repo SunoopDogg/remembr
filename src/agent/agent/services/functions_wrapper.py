@@ -7,6 +7,7 @@ across different Ollama models.
 """
 
 import json
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
@@ -21,17 +22,17 @@ from langchain_core.tools import BaseTool
 
 from ..utils.parser_utils import parse_json
 
+# Retry configuration for empty responses
+MAX_EMPTY_RESPONSE_RETRIES = 3
+EMPTY_RESPONSE_RETRY_DELAY = 1.0
+
 
 DEFAULT_SYSTEM_TEMPLATE = """You have access to the following tools:
 
 {tools}
 
-You must always select one of the above tools and respond with only a JSON object matching the following schema:
-
-{{
-  "tool": <name of the selected tool>,
-  "tool_input": <parameters for the selected tool, matching the tool's JSON schema>
-}}
+You must always select one of the above tools and respond with ONLY a JSON object.
+Example: {{"tool": "retrieve_from_text", "tool_input": {{"query": "blue car"}}}}
 """
 
 DEFAULT_RESPONSE_FUNCTION = {
@@ -126,19 +127,33 @@ class FunctionsWrapper(BaseChatModel, BaseLanguageModel):
             tools=json.dumps(functions, indent=2)
         )
 
-        response_message = self.llm.invoke([system_message] + messages)
-        chat_generation_content = response_message.content
+        # Retry logic for empty responses
+        chat_generation_content = ""
+        last_error = None
 
-        if not isinstance(chat_generation_content, str):
-            raise ValueError("FunctionsWrapper does not support non-string output.")
+        for attempt in range(MAX_EMPTY_RESPONSE_RETRIES):
+            response_message = self.llm.invoke([system_message] + messages)
+            chat_generation_content = response_message.content
+
+            if not isinstance(chat_generation_content, str):
+                raise ValueError("FunctionsWrapper does not support non-string output.")
+
+            # If we got a non-empty response, break out of retry loop
+            if chat_generation_content.strip():
+                break
+
+            # Empty response - retry after delay
+            if attempt < MAX_EMPTY_RESPONSE_RETRIES - 1:
+                time.sleep(EMPTY_RESPONSE_RETRY_DELAY * (attempt + 1))
 
         try:
             parsed_chat_result = parse_json(chat_generation_content)
-        except (ValueError, SyntaxError):
+        except (ValueError, SyntaxError) as e:
+            last_error = e
             raise ValueError(
-                f"Model did not respond with valid JSON. "
-                f"Response: {chat_generation_content}"
-            )
+                f"Model did not respond with valid JSON after {MAX_EMPTY_RESPONSE_RETRIES} attempts. "
+                f"Response: {chat_generation_content!r}"
+            ) from last_error
 
         # Unwrap if LLM wrapped the list inside a key like
         # {"reasoning": [...]}, {"tool_calls": [...]}, etc.
