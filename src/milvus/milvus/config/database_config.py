@@ -24,7 +24,7 @@ class DatabaseConfig:
     db_dir: str = '/root/remembr/src/milvus/db'
     db_filename: str = ''  # Empty means auto-generate from model
     collection_name: str = 'robot_memories'
-    embedding_model: str = 'jinaai/jina-embeddings-v3'
+    embedding_model: str = 'mixedbread-ai/mxbai-embed-large-v1'
     embedding_dim: int = 0  # 0 means auto-detect
     input_topic: str = '/caption_with_pose'
 
