@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class CaptionerConfig:
     """Captioner node configuration with ROS2 parameter defaults."""
 
-    model_path: str = 'NVILA-Lite-8B'
+    model_path: str = 'NVILA-8B'
     prompt_text: str = 'Describe what you see in these images.'
     conv_mode: str = 'vicuna_v1'
     segment_time: float = 3.0
