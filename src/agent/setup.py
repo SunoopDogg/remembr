@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'remembr_agent = agent.remembr_agent:main',
+            'navqa_evaluator = agent.scripts.navqa_evaluator:main',
         ],
     },
 )
