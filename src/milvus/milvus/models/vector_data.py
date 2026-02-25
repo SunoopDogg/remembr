@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from .caption_data import CaptionData
-from ..config import FIXED_SUBTRACT
+from ..config import TIMESTAMP_NORMALIZATION_EPOCH
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +31,7 @@ class VectorData:
         ]
 
         timestamp_seconds = float(caption_data.timestamp_sec) + (caption_data.timestamp_nanosec * 1e-9)
-        normalized_time = timestamp_seconds - FIXED_SUBTRACT
+        normalized_time = timestamp_seconds - TIMESTAMP_NORMALIZATION_EPOCH
         time_vector = [normalized_time, 0.0]
 
         return cls(

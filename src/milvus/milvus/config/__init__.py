@@ -1,8 +1,8 @@
-from .database_config import DatabaseConfig, FIXED_SUBTRACT, EMBEDDING_MODEL_DIMS
+from .database_config import DatabaseConfig, TIMESTAMP_NORMALIZATION_EPOCH, EMBEDDING_MODEL_DIMS
 
 __all__ = [
     'DatabaseConfig',
-    'FIXED_SUBTRACT',
+    'TIMESTAMP_NORMALIZATION_EPOCH',
     'EMBEDDING_MODEL_DIMS',
 ]
 

@@ -21,6 +21,7 @@ class PatrolState:
     """Patrol state enumeration."""
     IDLE = "IDLE"
     PATROLLING = "PATROLLING"
+    DWELLING = "DWELLING"
     RETURNING = "RETURNING"
 
 
@@ -43,12 +44,15 @@ class WaypointPatrolNode(Node):
         self.declare_parameter('initial_pose_x', -3.5)
         self.declare_parameter('initial_pose_y', -4.5)
         self.declare_parameter('initial_pose_yaw', 1.58)
+        # Dwell time at each waypoint for object observation (seconds)
+        self.declare_parameter('dwell_time', 5.0)
 
         self.auto_start = self.get_parameter('auto_start').value
         self.shutdown_on_complete = self.get_parameter('shutdown_on_complete').value
         self.initial_pose_x = self.get_parameter('initial_pose_x').value
         self.initial_pose_y = self.get_parameter('initial_pose_y').value
         self.initial_pose_yaw = self.get_parameter('initial_pose_yaw').value
+        self.dwell_time = self.get_parameter('dwell_time').value
 
         # Initialize BasicNavigator
         self.navigator = BasicNavigator()
@@ -56,7 +60,7 @@ class WaypointPatrolNode(Node):
         # State management
         self.state = PatrolState.IDLE
         self.current_waypoint_idx = 0
-        self.is_patrolling = False
+        self.dwell_start_time = None
 
         # Service to start patrol (optional, for manual trigger)
         self.start_patrol_service = self.create_service(
@@ -78,19 +82,14 @@ class WaypointPatrolNode(Node):
         self.get_logger().info('Waypoint Patrol Node initialized')
         self.get_logger().info(f'Auto start: {self.auto_start}')
         self.get_logger().info(f'Total waypoints: {len(WAYPOINTS)}')
+        self.get_logger().info(f'Dwell time per waypoint: {self.dwell_time}s')
 
         # Auto start patrol if enabled
         if self.auto_start:
             self.get_logger().info('Auto-starting patrol...')
             self.auto_start_timer = self.create_timer(1.0, self.auto_start_patrol)
 
-    def auto_start_patrol(self):
-        """Auto-start patrol after node initialization."""
-        # Cancel this one-shot timer
-        self.auto_start_timer.cancel()
-
-        # Set initial pose for AMCL localization
-        self.get_logger().info('Setting initial pose for AMCL...')
+    def _initialize_patrol(self):
         initial_pose = self.create_pose_stamped({
             'name': 'initial',
             'x': self.initial_pose_x,
@@ -98,22 +97,20 @@ class WaypointPatrolNode(Node):
             'yaw': self.initial_pose_yaw
         })
         self.navigator.setInitialPose(initial_pose)
-
-        # Wait for navigation to be ready
-        self.get_logger().info('Waiting for Nav2 to become active...')
         self.navigator.waitUntilNav2Active()
 
-        # Start patrol
         self.state = PatrolState.PATROLLING
         self.current_waypoint_idx = 0
-        self.is_patrolling = True
 
-        # Navigate to first waypoint
         self.navigate_to_current_waypoint()
-
-        # Start patrol loop timer
         self.patrol_timer = self.create_timer(0.5, self.patrol_loop)
 
+    def auto_start_patrol(self):
+        """Auto-start patrol after node initialization."""
+        self.auto_start_timer.cancel()
+        self.get_logger().info('Setting initial pose for AMCL...')
+        self.get_logger().info('Waiting for Nav2 to become active...')
+        self._initialize_patrol()
         self.get_logger().info(f'Patrol started with {len(WAYPOINTS)} waypoints')
 
     def yaw_to_quaternion(self, yaw):
@@ -177,28 +174,7 @@ class WaypointPatrolNode(Node):
             self.get_logger().warn(response.message)
             return response
 
-        # Set initial pose for AMCL localization
-        initial_pose = self.create_pose_stamped({
-            'name': 'initial',
-            'x': self.initial_pose_x,
-            'y': self.initial_pose_y,
-            'yaw': self.initial_pose_yaw
-        })
-        self.navigator.setInitialPose(initial_pose)
-
-        # Wait for navigation to be ready
-        self.navigator.waitUntilNav2Active()
-
-        # Start patrol
-        self.state = PatrolState.PATROLLING
-        self.current_waypoint_idx = 0
-        self.is_patrolling = True
-
-        # Navigate to first waypoint
-        self.navigate_to_current_waypoint()
-
-        # Start patrol loop timer
-        self.patrol_timer = self.create_timer(0.5, self.patrol_loop)
+        self._initialize_patrol()
 
         response.success = True
         response.message = f'Patrol started with {len(WAYPOINTS)} waypoints'
@@ -230,7 +206,23 @@ class WaypointPatrolNode(Node):
 
     def patrol_loop(self):
         """Main patrol loop - check navigation status and advance waypoints."""
-        if not self.is_patrolling:
+        if self.state == PatrolState.IDLE:
+            return
+
+        # Handle dwelling state (waiting at waypoint for observation)
+        if self.state == PatrolState.DWELLING:
+            elapsed = (self.get_clock().now() - self.dwell_start_time).nanoseconds / 1e9
+            if elapsed >= self.dwell_time:
+                # Dwell complete, move to next waypoint
+                self.current_waypoint_idx += 1
+
+                if self.current_waypoint_idx < len(WAYPOINTS):
+                    self.state = PatrolState.PATROLLING
+                    self.navigate_to_current_waypoint()
+                else:
+                    self.get_logger().info('All waypoints completed, returning to start')
+                    self.state = PatrolState.RETURNING
+                    self.navigate_to_start()
             return
 
         # Check if current navigation task is complete
@@ -241,32 +233,25 @@ class WaypointPatrolNode(Node):
                 if self.state == PatrolState.PATROLLING:
                     # Successfully reached current waypoint
                     waypoint = WAYPOINTS[self.current_waypoint_idx]
-                    self.get_logger().info(f'Reached waypoint: {waypoint["name"]}')
+                    self.get_logger().info(
+                        f'Reached waypoint: {waypoint["name"]} - '
+                        f'dwelling for {self.dwell_time}s to observe'
+                    )
 
-                    # Move to next waypoint
-                    self.current_waypoint_idx += 1
-
-                    if self.current_waypoint_idx < len(WAYPOINTS):
-                        # More waypoints to visit
-                        self.navigate_to_current_waypoint()
-                    else:
-                        # All waypoints completed, return to start
-                        self.get_logger().info('All waypoints completed, returning to start')
-                        self.state = PatrolState.RETURNING
-                        self.navigate_to_start()
+                    # Start dwelling at waypoint for observation
+                    self.state = PatrolState.DWELLING
+                    self.dwell_start_time = self.get_clock().now()
 
                 elif self.state == PatrolState.RETURNING:
                     # Successfully returned to start point
                     self.get_logger().info('Returned to start point, patrol complete')
                     self.state = PatrolState.IDLE
-                    self.is_patrolling = False
                     self.patrol_timer.cancel()
                     self._handle_patrol_complete()
 
             elif result == TaskResult.CANCELED:
                 self.get_logger().warn('Navigation was canceled')
                 self.state = PatrolState.IDLE
-                self.is_patrolling = False
                 self.patrol_timer.cancel()
 
             elif result == TaskResult.FAILED:
@@ -277,7 +262,6 @@ class WaypointPatrolNode(Node):
                     self.get_logger().error('Failed to return to start point')
 
                 self.state = PatrolState.IDLE
-                self.is_patrolling = False
                 self.patrol_timer.cancel()
 
     def _handle_patrol_complete(self):
@@ -305,6 +289,18 @@ class WaypointPatrolNode(Node):
                 )
             else:
                 status_msg = f'{self.state}: All waypoints completed'
+
+        elif self.state == PatrolState.DWELLING:
+            if self.current_waypoint_idx < len(WAYPOINTS):
+                waypoint = WAYPOINTS[self.current_waypoint_idx]
+                elapsed = (self.get_clock().now() - self.dwell_start_time).nanoseconds / 1e9
+                remaining = max(0, self.dwell_time - elapsed)
+                status_msg = (
+                    f'{self.state}: Observing at {waypoint["name"]} '
+                    f'({remaining:.1f}s remaining)'
+                )
+            else:
+                status_msg = f'{self.state}: Observation complete'
 
         elif self.state == PatrolState.RETURNING:
             status_msg = f'{self.state}: Returning to start point'

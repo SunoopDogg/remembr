@@ -5,14 +5,12 @@ from typing import Tuple
 
 from .milvus_service import MilvusService
 from .embedding_service import EmbeddingService
-from ..config import FIXED_SUBTRACT
+from ..config import TIMESTAMP_NORMALIZATION_EPOCH
 from ..utils.protocols import Logger
 
 
 class SearchService:
     """Vector similarity search service."""
-
-    OUTPUT_FIELDS = ["caption", "position", "theta", "time"]
 
     def __init__(
         self,
@@ -24,21 +22,16 @@ class SearchService:
         self.embedding_service = embedding_service
         self.logger = logger
 
+    def _execute_search(self, data: list, anns_field: str, limit: int) -> list[dict]:
+        """Execute a vector search and return processed results."""
+        results = self.milvus_service.search(data=[data], anns_field=anns_field, limit=limit)
+        return self._process_search_results(results)
+
     def search_by_text(self, query: str, limit: int = 5) -> list[dict]:
         """Search memories by text using vector similarity."""
         try:
             query_embedding = self.embedding_service.encode(query)
-
-            results = self.milvus_service.client.search(
-                collection_name=self.milvus_service.config.collection_name,
-                data=[query_embedding],
-                anns_field="text_embedding",
-                limit=limit,
-                output_fields=self.OUTPUT_FIELDS,
-            )
-
-            return self._process_search_results(results)
-
+            return self._execute_search(query_embedding, "text_embedding", limit)
         except Exception as e:
             self.logger.error(f'Error in search_by_text: {e}')
             return []
@@ -48,42 +41,21 @@ class SearchService:
         try:
             if len(position) != 3:
                 raise ValueError(f"Position must be 3D tuple (x,y,z), got {position}")
-
             position_vec = [float(p) for p in position]
-
-            results = self.milvus_service.client.search(
-                collection_name=self.milvus_service.config.collection_name,
-                data=[position_vec],
-                anns_field="position",
-                limit=limit,
-                output_fields=self.OUTPUT_FIELDS,
-            )
-
-            return self._process_search_results(results)
-
+            return self._execute_search(position_vec, "position", limit)
         except ValueError:
             raise
         except Exception as e:
             self.logger.error(f'Error in search_by_position: {e}')
             return []
 
-    def search_by_time(self, time_str: str, limit: int = 5, **kwargs) -> list[dict]:
+    def search_by_time(self, time_str: str, limit: int = 5) -> list[dict]:
         """Search memories by time using vector similarity."""
         try:
             time_str = time_str.strip()
             query_timestamp = self._parse_time_string(time_str)
             time_vector = [query_timestamp, 0.0]
-
-            results = self.milvus_service.client.search(
-                collection_name=self.milvus_service.config.collection_name,
-                data=[time_vector],
-                anns_field="time",
-                limit=limit,
-                output_fields=self.OUTPUT_FIELDS,
-            )
-
-            return self._process_search_results(results)
-
+            return self._execute_search(time_vector, "time", limit)
         except ValueError:
             raise
         except Exception as e:
@@ -92,7 +64,7 @@ class SearchService:
 
     def _parse_time_string(self, time_str: str) -> float:
         """Parse time string and return normalized timestamp."""
-        t = localtime(FIXED_SUBTRACT)
+        t = localtime(TIMESTAMP_NORMALIZATION_EPOCH)
         mdy_date = strftime('%m/%d/%Y', t)
         template = "%m/%d/%Y %H:%M:%S"
 
@@ -108,7 +80,7 @@ class SearchService:
         actual_timestamp = time.mktime(
             datetime.datetime.strptime(full_datetime, template).timetuple()
         )
-        return actual_timestamp - FIXED_SUBTRACT
+        return actual_timestamp - TIMESTAMP_NORMALIZATION_EPOCH
 
     def _process_search_results(self, results) -> list[dict]:
         """Process Milvus vector search results."""
@@ -135,21 +107,26 @@ class SearchService:
             return f"No memories found for query: {query_info}"
 
         output = ""
-        for doc in results:
+        for idx, doc in enumerate(results):
             timestamp = doc.get('time', 0.0)
-            actual_timestamp = timestamp + FIXED_SUBTRACT
+            actual_timestamp = timestamp + TIMESTAMP_NORMALIZATION_EPOCH
             t = localtime(actual_timestamp)
             time_str = strftime('%Y-%m-%d %H:%M:%S', t)
 
             position = doc.get('position', [0.0, 0.0, 0.0])
             orientation = doc.get('orientation', 0.0)
             text = doc.get('text', '')
+            distance = doc.get('distance', 0.0)
+
+            # Format position explicitly for LLM extraction
+            pos_str = f"[{position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f}]"
 
             output += (
-                f"At time={time_str}, the robot was at an average position of "
-                f"{[round(p, 3) for p in position]} with an average orientation of "
-                f"{round(orientation, 3)} radians."
-                f"The robot saw the following: {text}\n\n"
+                f"[Result {idx + 1}] (relevance_score: {distance:.4f})\n"
+                f"  POSITION: {pos_str}\n"
+                f"  ORIENTATION: {orientation:.3f} radians\n"
+                f"  TIME: {time_str}\n"
+                f"  DESCRIPTION: {text}\n\n"
             )
 
         return output.strip()
