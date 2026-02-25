@@ -8,14 +8,21 @@ def create_services(db_config, logger: Logger) -> tuple:
     """
     from milvus.services import MilvusService, EmbeddingService, SearchService
 
-    milvus = MilvusService(db_config, logger)
+    # Load embedding model first to detect dimension
+    embedding = EmbeddingService(
+        db_config.embedding_model,
+        logger,
+        expected_dim=db_config.embedding_dim,
+    )
+    embedding.load_model()
+    embedding_dim = embedding.embedding_dimension
+    logger.info(f'Embedding service ready (dim={embedding_dim})')
+
+    # Initialize Milvus with detected dimension
+    milvus = MilvusService(db_config, logger, embedding_dim=embedding_dim)
     milvus.connect()
     milvus.setup_collection()
     logger.info(f'Milvus collection "{db_config.collection_name}" ready')
-
-    embedding = EmbeddingService(db_config.embedding_model, logger)
-    embedding.load_model()
-    logger.info('Embedding service ready')
 
     search = SearchService(milvus, embedding, logger)
     logger.info('Search service ready')
@@ -23,7 +30,7 @@ def create_services(db_config, logger: Logger) -> tuple:
     return milvus, embedding, search
 
 
-def cleanup_services(milvus_service, embedding_service, logger=None) -> None:
+def cleanup_services(milvus_service, embedding_service, logger: Logger) -> None:
     """Clean up services gracefully."""
     if milvus_service:
         try:

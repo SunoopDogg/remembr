@@ -15,6 +15,7 @@ from agent_msgs.srv import Query
 from .config import AgentConfig
 from .services import ReMEmbRAgent
 from .services.service_factory import create_services, cleanup_services
+from .utils.type_utils import safe_float
 
 
 class ReMEmbRAgentNode(Node):
@@ -47,9 +48,7 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().info('ReMEmbR Agent node initialized successfully')
 
     def _log_error(self, context: str, error: Exception, reraise: bool = True) -> None:
-        """Log error with traceback."""
-        self.get_logger().error(f'{context}: {error}')
-        self.get_logger().error(traceback.format_exc())
+        self.get_logger().error(f'{context}: {error}\n{traceback.format_exc()}')
         if reraise:
             raise error
 
@@ -70,7 +69,7 @@ class ReMEmbRAgentNode(Node):
 
     def _cleanup_services(self) -> None:
         """Clean up any partially initialized services."""
-        cleanup_services(self._milvus_service, self._embedding_service)
+        cleanup_services(self._milvus_service, self._embedding_service, self.get_logger())
         self._milvus_service = None
         self._embedding_service = None
         self._search_service = None
@@ -135,8 +134,8 @@ class ReMEmbRAgentNode(Node):
         response.text = result.get('text') or ''
         response.binary = result.get('binary') or ''
         response.position = list(result.get('position') or [])
-        response.orientation = float(result.get('orientation') or 0.0)
-        response.time = float(result.get('time') or 0.0)
+        response.orientation = safe_float(result.get('orientation'), 0.0)
+        response.time = safe_float(result.get('time'), 0.0)
         response.error = result.get('error', '')
 
         return response
