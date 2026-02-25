@@ -5,10 +5,14 @@
     <!-- override the default position of the camera !-->
     <gui>
       <camera name='gzclient_camera'>
-      <!--
-        <pose>5 -4 2 0 0.2756 2.3561</pose>
-        -->
         <pose>-4.4965503 -0.4874 1.508684 0 -0 0</pose>
+        <track_visual>
+          <name>turtlebot3_waffle_pi</name>
+          <static>true</static>
+          <use_model_frame>true</use_model_frame>
+          <xyz>-2.0 0 0.5</xyz>
+          <inherit_yaw>true</inherit_yaw>
+        </track_visual>
       </camera>
     </gui>
     <gravity>0 0 -9.8</gravity>
@@ -747,6 +751,7 @@
       <direction>0 0 -1</direction>
     </light>
     <include>
+      <name>turtlebot3_waffle_pi</name>
       <pose>-3.5 -4.5 0.0 0.0 0.0 1.58</pose>
       <uri>model://turtlebot3_waffle_pi</uri>
     </include>

@@ -114,8 +114,29 @@ class FunctionsWrapper(BaseChatModel, BaseLanguageModel):
                 )
             del kwargs["function_call"]
 
-        if len(functions) > 0 and _is_pydantic_class(functions[0]):
-            functions = [convert_to_ollama_tool(fn) for fn in functions]
+        # Convert tools to definition dicts.
+        # When called via bind_tools(), functions may contain StructuredTool
+        # objects (BaseTool subclasses) rather than raw Pydantic schema classes.
+        tool_defs = []
+        for fn in functions:
+            if isinstance(fn, dict):
+                tool_defs.append(fn)
+            elif isinstance(fn, BaseTool):
+                schema = (
+                    fn.args_schema.schema()
+                    if fn.args_schema
+                    else {"type": "object", "properties": {}}
+                )
+                tool_defs.append({
+                    "name": fn.name,
+                    "description": fn.description or "",
+                    "parameters": schema,
+                })
+            elif _is_pydantic_class(fn):
+                tool_defs.append(convert_to_ollama_tool(fn))
+            else:
+                tool_defs.append(fn)
+        functions = tool_defs
 
         functions.insert(0, DEFAULT_RESPONSE_FUNCTION)
 

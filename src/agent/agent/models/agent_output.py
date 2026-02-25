@@ -11,7 +11,7 @@ class AgentOutput:
     type: Optional[str] = None
     text: Optional[str] = None
     binary: Optional[str] = None
-    position: Optional[tuple] = None
+    position: Optional[list] = None
     orientation: Optional[float] = None
     time: Optional[float] = None
     duration: Optional[float] = None

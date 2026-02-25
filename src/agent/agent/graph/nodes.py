@@ -57,13 +57,18 @@ class GraphNodes:
         self.prompts = prompts
         # Store tools for native bind_tools() (StructuredTool objects)
         self.tools = tools
+        self.last_parsed_result: dict | None = None
         self.reset_state()
 
     def reset_state(self) -> None:
-        """Reset mutable state for a new query."""
+        """Reset mutable iteration state for a new query.
+
+        Note: last_parsed_result is NOT cleared here because it is read
+        by agent_service.query() after graph.invoke() returns. It is set
+        independently in _generate_node_impl.
+        """
         self._tool_history_items: list[str] = []
         self.iteration_count: int = 0
-        self.last_parsed_result: dict | None = None
 
     def _get_tool_history(self) -> str:
         """Get formatted tool history string."""
@@ -154,13 +159,18 @@ class GraphNodes:
         response_data = self._extract_response(parsed)
         self._normalize_and_validate(response_data)
 
-        self.reset_state()
         self.last_parsed_result = response_data
+        self.reset_state()
 
         return {"messages": [AIMessage(content=json.dumps(response_data))]}
 
-    def _extract_response(self, parsed: dict) -> dict:
+    def _extract_response(self, parsed) -> dict:
         """Extract response data from nested LLM output."""
+        # Handle list output (LLM may wrap response in array)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            parsed = parsed[0]
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Expected dict from LLM output, got {type(parsed).__name__}")
         if "tool_input" in parsed:
             parsed = parsed["tool_input"]
         if "response" in parsed and isinstance(parsed["response"], dict):
