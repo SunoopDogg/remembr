@@ -226,3 +226,61 @@ class TestQdrantService:
             limit=5,
             with_payload=True,
         )
+
+
+class TestSearchService:
+    def _make_service(self):
+        from qdrant.services.search_service import SearchService
+        from unittest.mock import MagicMock
+        qdrant_service = MagicMock()
+        embedding_service = MagicMock()
+        logger = MagicMock()
+        return SearchService(qdrant_service, embedding_service, logger)
+
+    def test_parse_time_string_hms_returns_float(self):
+        service = self._make_service()
+        result = service._parse_time_string('00:00:00')
+        assert isinstance(result, float)
+
+    def test_parse_time_string_invalid_raises(self):
+        service = self._make_service()
+        with pytest.raises(ValueError, match='HH:MM:SS'):
+            service._parse_time_string('invalid')
+
+    def test_parse_time_string_full_datetime(self):
+        service = self._make_service()
+        result = service._parse_time_string('07/24/2024 00:00:00')
+        assert isinstance(result, float)
+
+    def test_process_search_results_empty(self):
+        service = self._make_service()
+        assert service._process_search_results([]) == []
+
+    def test_process_search_results_extracts_payload(self):
+        from unittest.mock import MagicMock
+        service = self._make_service()
+        hit = MagicMock()
+        hit.payload = {
+            'caption': 'robot sees door',
+            'position': [1.0, 2.0, 3.0],
+            'theta': 1.5,
+            'time': [200.0, 0.0],
+        }
+        hit.score = 0.85
+        results = service._process_search_results([hit])
+        assert len(results) == 1
+        assert results[0]['text'] == 'robot sees door'
+        assert results[0]['position'] == [1.0, 2.0, 3.0]
+        assert results[0]['orientation'] == 1.5
+        assert results[0]['time'] == 200.0
+        assert results[0]['distance'] == 0.85
+
+    def test_search_by_position_wrong_dim_raises(self):
+        service = self._make_service()
+        with pytest.raises(ValueError, match='3D'):
+            service.search_by_position((1.0, 2.0))
+
+    def test_format_results_empty(self):
+        service = self._make_service()
+        result = service.format_results([], 'test query')
+        assert 'No memories found' in result
