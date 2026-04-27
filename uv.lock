@@ -2317,7 +2317,7 @@ wheels = [
 
 [[package]]
 name = "ps3-torch"
-version = "0.1.3"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate" },
@@ -2332,9 +2332,9 @@ dependencies = [
     { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and sys_platform == 'emscripten') or (python_full_version >= '3.11' and sys_platform == 'win32')" },
     { name = "transformers", extra = ["sentencepiece"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/95/ef5494f0267a84455f09dc17430d2775e57bd02262444d0a9db2a73dea5b/ps3_torch-0.1.3.tar.gz", hash = "sha256:073c8411d580a4a4c594ae7ce3253efd3ff6b29dfe3eba7e04c4da5b2236f8d9", size = 45929, upload-time = "2025-08-05T00:51:07.534Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/8a/b026978d64cfaf44cc2da9f5dabacd736eb70bfeb68ae46b164b46424a83/ps3_torch-0.1.1.tar.gz", hash = "sha256:38eca38d71040488378ff4e448ae423c8fc96dc84acea1f2ee9952626d0d2478", size = 40830, upload-time = "2025-05-16T02:30:57.681Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/8b/797cbd0310fdfa0442e321b652aa0dc4394467c1fced831a185e4a9b1b45/ps3_torch-0.1.3-py3-none-any.whl", hash = "sha256:746de1a14df6160ae684ba63dbde428bff072d50a3b8b2f6f90d9a22cb03bc32", size = 42956, upload-time = "2025-08-05T00:51:06.129Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/53/76c97669a2eb5fbc90bbfb51ec7e5c64716ec979305804614546090597cd/ps3_torch-0.1.1-py3-none-any.whl", hash = "sha256:ed211b302b1eb25b3857c3ab720f0d31194c5e4cfe3279af2da7dc45ed6bfa2e", size = 39355, upload-time = "2025-05-16T02:30:56.134Z" },
 ]
 
 [[package]]

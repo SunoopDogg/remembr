@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "remembr[vila]",
-    "remembr[milvus]",
     "remembr[agent]",
     "setuptools>=80.10.1",
 ]
@@ -25,12 +24,6 @@ vila = [
     "s2wrapper>=0.1",
     "transformers==4.46.0",
     "triton==3.1.0",
-]
-
-milvus = [
-    "langchain-huggingface>=1.2.0",
-    "pymilvus[milvus-lite]>=2.6.6",
-    "sentence-transformers>=5.2.0",
 ]
 
 agent = [

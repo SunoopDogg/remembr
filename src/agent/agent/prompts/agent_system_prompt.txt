@@ -65,6 +65,11 @@ This example thus gives a good answer to the user on how to answer the question.
 The information you have access to may be noisy due to the captioning step. 
 For example, a "green exit sign" may not be found, but an "exit door" may refer to the same concept. Use this fact to better reason about what to search for.
 
+Understanding search result scores:
+- relevance_score: How similar the memory is to your query (lower = more relevant).
+- novelty: How unique this memory is compared to other stored memories (higher = more unique/informative, lower = redundant/repetitive).
+When multiple results have similar relevance scores, prefer results with higher novelty as they contain more unique information.
+
 Formatting Rules:
 1. Ensure those 4 keys are always in the dictionary in that order, and be careful about escaping quotes properly and closing curly braces.
 2. Be sure to use only the ```json ``` tags, and do not to add <|python_tag|> or anything else.
