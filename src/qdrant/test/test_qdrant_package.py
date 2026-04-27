@@ -143,3 +143,86 @@ class TestQdrantMemoryRecord:
         record = QdrantMemoryRecord.from_caption_and_vectors(caption_data, vector_data)
         assert len(record.id) == 36
         assert record.caption == 'test caption'
+
+
+class TestQdrantService:
+    def _make_service(self, mock_client):
+        from qdrant.services.qdrant_service import QdrantService
+        from qdrant.config.database_config import DatabaseConfig
+        from unittest.mock import MagicMock
+        config = DatabaseConfig()
+        logger = MagicMock()
+        service = QdrantService(config, logger, embedding_dim=1024)
+        service.client = mock_client
+        return service
+
+    def test_embedding_dim_from_config(self):
+        from qdrant.services.qdrant_service import QdrantService
+        from qdrant.config.database_config import DatabaseConfig
+        from unittest.mock import MagicMock
+        config = DatabaseConfig(embedding_model='mixedbread-ai/mxbai-embed-large-v1')
+        service = QdrantService(config, MagicMock())
+        assert service.embedding_dim == 1024
+
+    def test_embedding_dim_fallback(self):
+        from qdrant.services.qdrant_service import QdrantService
+        from qdrant.config.database_config import DatabaseConfig
+        from unittest.mock import MagicMock
+        config = DatabaseConfig(embedding_model='unknown/model')
+        service = QdrantService(config, MagicMock())
+        assert service.embedding_dim == 1024
+
+    def test_setup_collection_skips_if_exists(self):
+        from unittest.mock import MagicMock
+        mock_client = MagicMock()
+        mock_client.collection_exists.return_value = True
+        service = self._make_service(mock_client)
+        service.setup_collection()
+        mock_client.create_collection.assert_not_called()
+
+    def test_setup_collection_creates_with_named_vectors(self):
+        from unittest.mock import MagicMock
+        from qdrant_client.models import Distance
+        mock_client = MagicMock()
+        mock_client.collection_exists.return_value = False
+        service = self._make_service(mock_client)
+        service.setup_collection()
+        mock_client.create_collection.assert_called_once()
+        call_kwargs = mock_client.create_collection.call_args.kwargs
+        vectors_config = call_kwargs['vectors_config']
+        assert 'text_embedding' in vectors_config
+        assert 'position' in vectors_config
+        assert 'time' in vectors_config
+        assert vectors_config['text_embedding'].distance == Distance.COSINE
+        assert vectors_config['position'].distance == Distance.EUCLID
+        assert vectors_config['time'].distance == Distance.EUCLID
+
+    def test_upsert_record_calls_client(self):
+        from unittest.mock import MagicMock
+        from qdrant.models.qdrant_record import QdrantMemoryRecord
+        mock_client = MagicMock()
+        service = self._make_service(mock_client)
+        record = QdrantMemoryRecord(
+            id='test-id',
+            text_embedding=[0.1] * 1024,
+            position=[1.0, 2.0, 3.0],
+            theta=0.0,
+            time=[100.0, 0.0],
+            caption='test',
+        )
+        service.upsert_record(record)
+        mock_client.upsert.assert_called_once()
+
+    def test_search_calls_query_points(self):
+        from unittest.mock import MagicMock
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+        service = self._make_service(mock_client)
+        service.search(vector=[0.1, 0.2], using='text_embedding', limit=5)
+        mock_client.query_points.assert_called_once_with(
+            collection_name='robot_memories',
+            query=[0.1, 0.2],
+            using='text_embedding',
+            limit=5,
+            with_payload=True,
+        )
