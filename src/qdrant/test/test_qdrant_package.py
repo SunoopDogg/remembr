@@ -284,3 +284,33 @@ class TestSearchService:
         service = self._make_service()
         result = service.format_results([], 'test query')
         assert 'No memories found' in result
+
+
+class TestDataPipeline:
+    def test_process_ros_message_returns_record(self):
+        from qdrant.services.data_pipeline import DataPipeline
+        from qdrant.models.qdrant_record import QdrantMemoryRecord
+        from unittest.mock import MagicMock
+
+        embedding_service = MagicMock()
+        embedding_service.model.embed_query.return_value = [0.1] * 1024
+
+        pipeline = DataPipeline(embedding_service)
+
+        msg = MagicMock()
+        msg.caption = 'robot in kitchen'
+        msg.position_x = 1.0
+        msg.position_y = 2.0
+        msg.position_z = 0.0
+        msg.theta = 0.5
+        msg.timestamp.sec = 1721761100
+        msg.timestamp.nanosec = 0
+
+        record = pipeline.process_ros_message(msg)
+
+        assert isinstance(record, QdrantMemoryRecord)
+        assert record.caption == 'robot in kitchen'
+        assert len(record.id) == 36
+        assert len(record.text_embedding) == 1024
+        assert record.position == [1.0, 2.0, 0.0]
+        assert record.time[1] == 0.0
