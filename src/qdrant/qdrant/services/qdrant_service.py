@@ -7,6 +7,10 @@ from ..config.database_config import DatabaseConfig
 from ..models.qdrant_record import QdrantMemoryRecord
 from ..utils.protocols import Logger
 
+TEXT_VECTOR = 'text_embedding'
+POSITION_VECTOR = 'position'
+TIME_VECTOR = 'time'
+
 
 class QdrantService:
     """Qdrant database operations service."""
@@ -27,7 +31,6 @@ class QdrantService:
         self.client = None
 
     def connect(self) -> None:
-        """Connect to Qdrant server."""
         try:
             self.logger.info('Connecting to Qdrant...')
             self.client = QdrantClient(url=self.config.qdrant_url)
@@ -38,29 +41,30 @@ class QdrantService:
             raise
 
     def setup_collection(self) -> None:
-        """Set up Qdrant collection with Named Vectors schema."""
-        if self.client.collection_exists(self.config.collection_name):
-            self.logger.info(f'Collection "{self.config.collection_name}" already exists')
+        """Set up Named Vectors schema; no-op if collection already exists."""
+        name = self.config.collection_name
+        if self.client.collection_exists(name):
+            self.logger.info(f'Collection {name!r} already exists')
             return
 
         self.client.create_collection(
-            collection_name=self.config.collection_name,
+            collection_name=name,
             vectors_config={
-                'text_embedding': VectorParams(size=self.embedding_dim, distance=Distance.COSINE),
-                'position':       VectorParams(size=3,                  distance=Distance.EUCLID),
-                'time':           VectorParams(size=2,                  distance=Distance.EUCLID),
+                TEXT_VECTOR:     VectorParams(size=self.embedding_dim, distance=Distance.COSINE),
+                POSITION_VECTOR: VectorParams(size=3,                  distance=Distance.EUCLID),
+                TIME_VECTOR:     VectorParams(size=2,                  distance=Distance.EUCLID),
             },
         )
-        self.logger.info(f'Created collection "{self.config.collection_name}"')
+        self.logger.info(f'Created collection {name!r}')
 
     def reset_database(self) -> None:
-        """Reset database by dropping and recreating collection."""
+        name = self.config.collection_name
         self.logger.info('Starting database reset...')
         try:
-            if self.client.collection_exists(self.config.collection_name):
-                self.logger.info(f'Dropping collection "{self.config.collection_name}"...')
-                self.client.delete_collection(self.config.collection_name)
-                self.logger.info(f'Collection "{self.config.collection_name}" dropped')
+            if self.client.collection_exists(name):
+                self.logger.info(f'Dropping collection {name!r}...')
+                self.client.delete_collection(name)
+                self.logger.info(f'Collection {name!r} dropped')
             self.setup_collection()
             self.logger.info('Database reset complete')
         except Exception as e:
@@ -69,7 +73,6 @@ class QdrantService:
             raise
 
     def upsert_record(self, record: QdrantMemoryRecord) -> None:
-        """Upsert record into Qdrant collection."""
         try:
             self.client.upsert(
                 collection_name=self.config.collection_name,
@@ -82,7 +85,7 @@ class QdrantService:
             raise
 
     def search(self, vector: list, using: str, limit: int) -> list:
-        """Execute Named Vector search on the configured collection."""
+        """Execute Named Vector search; using must be TEXT_VECTOR / POSITION_VECTOR / TIME_VECTOR."""
         return self.client.query_points(
             collection_name=self.config.collection_name,
             query=vector,
@@ -92,11 +95,9 @@ class QdrantService:
         ).points
 
     def collection_exists(self) -> bool:
-        """Check if collection exists."""
         return self.client.collection_exists(self.config.collection_name)
 
     def close(self) -> None:
-        """Close Qdrant connection."""
         if self.client:
             try:
                 self.client.close()

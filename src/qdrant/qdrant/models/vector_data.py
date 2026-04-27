@@ -8,7 +8,7 @@ from ..config import TIMESTAMP_NORMALIZATION_EPOCH
 
 @dataclass(frozen=True, slots=True)
 class VectorData:
-    """Computed vector embeddings for Milvus storage."""
+    """Computed vector embeddings for Qdrant storage."""
 
     text_embedding: list[float]
     position_vector: list[float]
