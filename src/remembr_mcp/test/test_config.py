@@ -3,7 +3,10 @@ import pytest
 from remembr_mcp.config import load_config, SimpleLogger
 
 
-def test_load_config_defaults():
+def test_load_config_defaults(monkeypatch):
+    monkeypatch.delenv('QDRANT_URL', raising=False)
+    monkeypatch.delenv('QDRANT_COLLECTION', raising=False)
+    monkeypatch.delenv('EMBEDDING_MODEL', raising=False)
     config = load_config()
     assert config.qdrant_url == 'http://localhost:6333'
     assert config.collection_name == 'robot_memories'

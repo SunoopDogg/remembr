@@ -19,6 +19,12 @@ class SimpleLogger:
     def warning(self, msg: str) -> None:
         self._log.warning(msg)
 
+    def debug(self, msg: str) -> None:
+        self._log.debug(msg)
+
+    def fatal(self, msg: str) -> None:
+        self._log.critical(msg)
+
 
 def load_config() -> DatabaseConfig:
     """Load DatabaseConfig from environment variables."""
