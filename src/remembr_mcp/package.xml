@@ -3,7 +3,7 @@
   <name>remembr_mcp</name>
   <version>0.1.0</version>
   <description>ROS2 MCP server for ReMEmbR agent</description>
-  <maintainer email="user@example.com">user</maintainer>
+  <maintainer email="aswoo55555@gmail.com">SunoopDogg</maintainer>
   <license>Apache-2.0</license>
 
   <exec_depend>rclpy</exec_depend>

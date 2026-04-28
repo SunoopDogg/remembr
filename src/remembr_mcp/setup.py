@@ -7,7 +7,7 @@ setup(
     install_requires=[
         'mcp>=1.0.0',
         'qdrant-client>=1.14.0',
-        'langchain-huggingface>=0.1.0',
+        'langchain-huggingface>=1.0.0',
     ],
     entry_points={
         'console_scripts': [
