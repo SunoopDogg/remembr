@@ -2,3 +2,6 @@
 	path = src/navigation2
 	url = https://github.com/ros-navigation/navigation2.git
 	branch = humble
+[submodule "src/claw-code"]
+	path = src/claw-code
+	url = https://github.com/ultraworkers/claw-code
