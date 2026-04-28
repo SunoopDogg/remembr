@@ -109,6 +109,8 @@ def test_submit_result_calls_publisher_with_correct_fields():
     mock_pub.publish.assert_called_once()
     payload = mock_pub.publish.call_args[0][0]
     assert payload['type'] == 'position'
+    assert payload['type_reasoning'] == 'where question'
+    assert payload['answer_reasoning'] == 'found at [0.78, -0.41, 0.0]'
     assert payload['position'] == [0.78, -0.41, 0.0]
     assert payload['orientation'] == 0.0
     assert payload['text'] == 'The sofa is in the living room'

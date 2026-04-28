@@ -53,6 +53,8 @@ def submit_result(
     """Submit the final structured answer. MUST be called to complete a query."""
     result = {
         'type': type,
+        'type_reasoning': type_reasoning,
+        'answer_reasoning': answer_reasoning,
         'text': text,
         'binary': binary,
         'position': position,
