@@ -1,0 +1,19 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8000/v1",
+    "ANTHROPIC_API_KEY": "dummy"
+  },
+  "model": "gpt-oss:20b",
+  "mcpServers": {
+    "remembr": {
+      "command": "python3",
+      "args": ["-m", "remembr_mcp"],
+      "env": {
+        "ROS_DOMAIN_ID": "0",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_COLLECTION": "robot_memories",
+        "EMBEDDING_MODEL": "mixedbread-ai/mxbai-embed-large-v1"
+      }
+    }
+  }
+}
