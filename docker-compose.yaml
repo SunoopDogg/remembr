@@ -31,39 +31,12 @@ services:
     profiles:
       - gpu
 
-  qdrant:
+  remembr-qdrant:
     image: qdrant/qdrant:latest
-    container_name: qdrant
+    container_name: remembr-qdrant
     volumes:
       - ./src/qdrant/db:/qdrant/storage
     network_mode: host
-
-  vllm-embed:
-    image: vllm/vllm-openai:latest
-    container_name: vllm-embed
-    command:
-      - "--model=${BIM_EMBEDDING_MODEL}"
-      - "--runner=pooling"
-      - "--trust-remote-code"
-      - "--port=${BIM_EMBEDDING_PORT}"
-      - "--dtype=${BIM_EMBEDDING_DTYPE}"
-      - "--quantization=${BIM_EMBEDDING_QUANTIZATION}"
-      - "--max-model-len=${BIM_EMBEDDING_MAX_MODEL_LEN}"
-      - "--gpu-memory-utilization=${BIM_EMBEDDING_GPU_MEM_UTIL}"
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    network_mode: host
-    ipc: host
-    restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    profiles:
-      - gpu
 
   # ===== Jetson ARM64 =====
   remembr-jetson:
