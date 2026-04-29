@@ -26,13 +26,14 @@ class MemoryBuilder(Node):
         self._config.validate()
 
         self.get_logger().info(f'Qdrant URL: {self._config.qdrant_url}')
+        self.get_logger().info(f'Embedding server: {self._config.embedding_url}')
         self.get_logger().info(f'Embedding model: {self._config.embedding_model}')
         self.get_logger().info(f'Collection: {self._config.collection_name}')
 
         self._embedding_service = EmbeddingService(
             self._config.embedding_model,
+            self._config.embedding_url,
             self.get_logger(),
-            expected_dim=self._config.embedding_dim,
         )
         self._qdrant_service = None
         self._data_pipeline = None

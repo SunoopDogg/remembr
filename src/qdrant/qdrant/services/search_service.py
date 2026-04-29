@@ -27,7 +27,7 @@ class SearchService:
 
     def search_by_text(self, query: str, limit: int = 10) -> list[dict]:
         try:
-            query_embedding = self.embedding_service.encode(query)
+            query_embedding = self.embedding_service.encode_query(query)
             return self._execute_search(query_embedding, TEXT_VECTOR, limit)
         except Exception as e:
             self.logger.error(f'Error in search_by_text: {e}')

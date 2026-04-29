@@ -19,15 +19,11 @@ class QdrantService:
         self,
         config: DatabaseConfig,
         logger: Logger,
-        embedding_dim: int | None = None,
+        embedding_dim: int = 0,
     ) -> None:
         self.config = config
         self.logger = logger
-        self.embedding_dim = (
-            embedding_dim
-            or config.get_known_embedding_dim()
-            or 1024
-        )
+        self.embedding_dim = embedding_dim
         self.client = None
 
     def connect(self) -> None:
@@ -47,6 +43,11 @@ class QdrantService:
             self.logger.info(f'Collection {name!r} already exists')
             return
 
+        if not self.embedding_dim:
+            raise RuntimeError(
+                'embedding_dim must be set before creating collection'
+            )
+
         self.client.create_collection(
             collection_name=name,
             vectors_config={
@@ -55,7 +56,7 @@ class QdrantService:
                 TIME_VECTOR:     VectorParams(size=2,                  distance=Distance.EUCLID),
             },
         )
-        self.logger.info(f'Created collection {name!r}')
+        self.logger.info(f'Created collection {name!r} (text_embedding dim={self.embedding_dim})')
 
     def reset_database(self) -> None:
         name = self.config.collection_name

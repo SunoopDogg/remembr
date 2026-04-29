@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from langchain_huggingface import HuggingFaceEmbeddings
-
 from .caption_data import CaptionData
 from ..config import TIMESTAMP_NORMALIZATION_EPOCH
 
@@ -19,25 +17,22 @@ class VectorData:
     def from_caption_data(
         cls,
         caption_data: CaptionData,
-        embedding_model: HuggingFaceEmbeddings,
+        text_embedding: list[float],
     ) -> 'VectorData':
-        """Create VectorData from CaptionData using embedding model."""
-        text_embedding = embedding_model.embed_query(caption_data.caption)
-
+        """Create VectorData from CaptionData and a pre-computed text embedding."""
         position_vector = [
             caption_data.position_x,
             caption_data.position_y,
-            caption_data.position_z
+            caption_data.position_z,
         ]
 
         timestamp_seconds = float(caption_data.timestamp_sec) + (caption_data.timestamp_nanosec * 1e-9)
         normalized_time = timestamp_seconds - TIMESTAMP_NORMALIZATION_EPOCH
-        time_vector = [normalized_time, 0.0]
 
         return cls(
             text_embedding=text_embedding,
             position_vector=position_vector,
-            time=time_vector,
+            time=[normalized_time, 0.0],
             theta=caption_data.theta,
         )
 

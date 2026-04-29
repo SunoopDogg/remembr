@@ -16,6 +16,16 @@ class TestDatabaseConfig:
         config = DatabaseConfig()
         assert config.collection_name == 'robot_memories'
 
+    def test_default_embedding_url(self):
+        from qdrant.config.database_config import DatabaseConfig
+        config = DatabaseConfig()
+        assert config.embedding_url == 'http://localhost:8080'
+
+    def test_default_embedding_model(self):
+        from qdrant.config.database_config import DatabaseConfig
+        config = DatabaseConfig()
+        assert config.embedding_model == 'Qwen/Qwen3-Embedding-8B'
+
     def test_validate_empty_collection_raises(self):
         from qdrant.config.database_config import DatabaseConfig
         config = DatabaseConfig(collection_name='')
@@ -27,16 +37,6 @@ class TestDatabaseConfig:
         config = DatabaseConfig(collection_name='invalid-name!')
         with pytest.raises(ValueError, match='alphanumeric'):
             config.validate()
-
-    def test_get_known_embedding_dim(self):
-        from qdrant.config.database_config import DatabaseConfig
-        config = DatabaseConfig(embedding_model='mixedbread-ai/mxbai-embed-large-v1')
-        assert config.get_known_embedding_dim() == 1024
-
-    def test_get_known_embedding_dim_unknown(self):
-        from qdrant.config.database_config import DatabaseConfig
-        config = DatabaseConfig(embedding_model='unknown/model')
-        assert config.get_known_embedding_dim() is None
 
     def test_timestamp_normalization_epoch(self):
         from qdrant.config.database_config import TIMESTAMP_NORMALIZATION_EPOCH
@@ -146,31 +146,29 @@ class TestQdrantMemoryRecord:
 
 
 class TestQdrantService:
-    def _make_service(self, mock_client):
+    def _make_service(self, mock_client, embedding_dim=4096):
         from qdrant.services.qdrant_service import QdrantService
         from qdrant.config.database_config import DatabaseConfig
         from unittest.mock import MagicMock
         config = DatabaseConfig()
         logger = MagicMock()
-        service = QdrantService(config, logger, embedding_dim=1024)
+        service = QdrantService(config, logger, embedding_dim=embedding_dim)
         service.client = mock_client
         return service
 
-    def test_embedding_dim_from_config(self):
+    def test_embedding_dim_explicit(self):
         from qdrant.services.qdrant_service import QdrantService
         from qdrant.config.database_config import DatabaseConfig
         from unittest.mock import MagicMock
-        config = DatabaseConfig(embedding_model='mixedbread-ai/mxbai-embed-large-v1')
-        service = QdrantService(config, MagicMock())
-        assert service.embedding_dim == 1024
+        service = QdrantService(DatabaseConfig(), MagicMock(), embedding_dim=4096)
+        assert service.embedding_dim == 4096
 
-    def test_embedding_dim_fallback(self):
+    def test_embedding_dim_default_zero(self):
         from qdrant.services.qdrant_service import QdrantService
         from qdrant.config.database_config import DatabaseConfig
         from unittest.mock import MagicMock
-        config = DatabaseConfig(embedding_model='unknown/model')
-        service = QdrantService(config, MagicMock())
-        assert service.embedding_dim == 1024
+        service = QdrantService(DatabaseConfig(), MagicMock())
+        assert service.embedding_dim == 0
 
     def test_setup_collection_skips_if_exists(self):
         from unittest.mock import MagicMock
@@ -179,6 +177,14 @@ class TestQdrantService:
         service = self._make_service(mock_client)
         service.setup_collection()
         mock_client.create_collection.assert_not_called()
+
+    def test_setup_collection_raises_without_dim(self):
+        from unittest.mock import MagicMock
+        mock_client = MagicMock()
+        mock_client.collection_exists.return_value = False
+        service = self._make_service(mock_client, embedding_dim=0)
+        with pytest.raises(RuntimeError, match='embedding_dim must be set'):
+            service.setup_collection()
 
     def test_setup_collection_creates_with_named_vectors(self):
         from unittest.mock import MagicMock
@@ -204,7 +210,7 @@ class TestQdrantService:
         service = self._make_service(mock_client)
         record = QdrantMemoryRecord(
             id='test-id',
-            text_embedding=[0.1] * 1024,
+            text_embedding=[0.1] * 4096,
             position=[1.0, 2.0, 3.0],
             theta=0.0,
             time=[100.0, 0.0],
@@ -275,6 +281,17 @@ class TestSearchService:
         assert results[0]['time'] == 200.0
         assert results[0]['distance'] == 0.85
 
+    def test_search_by_text_calls_encode_query(self):
+        from unittest.mock import MagicMock
+        from qdrant.services.search_service import SearchService
+        qdrant_service = MagicMock()
+        qdrant_service.search.return_value = []
+        embedding_service = MagicMock()
+        embedding_service.encode_query.return_value = [0.1] * 4096
+        service = SearchService(qdrant_service, embedding_service, MagicMock())
+        service.search_by_text('where is the kitchen?')
+        embedding_service.encode_query.assert_called_once_with('where is the kitchen?')
+
     def test_search_by_position_wrong_dim_raises(self):
         service = self._make_service()
         with pytest.raises(ValueError, match='3D'):
@@ -293,7 +310,7 @@ class TestDataPipeline:
         from unittest.mock import MagicMock
 
         embedding_service = MagicMock()
-        embedding_service.model.embed_query.return_value = [0.1] * 1024
+        embedding_service.encode_document.return_value = [0.1] * 4096
 
         pipeline = DataPipeline(embedding_service)
 
@@ -311,6 +328,7 @@ class TestDataPipeline:
         assert isinstance(record, QdrantMemoryRecord)
         assert record.caption == 'robot in kitchen'
         assert len(record.id) == 36
-        assert len(record.text_embedding) == 1024
+        assert len(record.text_embedding) == 4096
         assert record.position == [1.0, 2.0, 0.0]
         assert record.time[1] == 0.0
+        embedding_service.encode_document.assert_called_once_with('robot in kitchen')

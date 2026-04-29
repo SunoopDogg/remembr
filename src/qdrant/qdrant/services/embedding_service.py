@@ -1,87 +1,86 @@
+import time
 import traceback
 
-from langchain_huggingface import HuggingFaceEmbeddings
+import httpx
 
-from ..config.database_config import EMBEDDING_MODEL_DIMS
 from ..utils.protocols import Logger
+
+RETRIEVAL_INSTRUCTION = 'Given a query, retrieve relevant passages that answer the query'
 
 
 class EmbeddingService:
-    """Embedding model management and encoding service."""
+    """HTTP client for vLLM embedding server."""
 
-    def __init__(
-        self,
-        model_name: str,
-        logger: Logger,
-        expected_dim: int = 0,
-    ) -> None:
+    def __init__(self, model_name: str, base_url: str, logger: Logger) -> None:
         self.model_name = model_name
+        self.base_url = base_url
         self.logger = logger
-        self.expected_dim = expected_dim
-        self.model = None
+        self._client: httpx.Client | None = None
         self._detected_dim: int | None = None
 
-    def load_model(self) -> None:
-        """Load HuggingFaceEmbeddings model and detect embedding dimension."""
-        try:
-            self.logger.info(f'Loading {self.model_name} model (HuggingFaceEmbeddings)...')
+    def load_model(self, max_retries: int = 30, retry_interval: float = 5.0) -> None:
+        """Connect to vLLM server and detect embedding dimension with retry."""
+        self._client = httpx.Client(base_url=self.base_url, timeout=30.0)
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.logger.info(
+                    f'Connecting to embedding server at {self.base_url} '
+                    f'(attempt {attempt}/{max_retries})...'
+                )
+                test_embedding = self.encode_document('dimension test')
+                self._detected_dim = len(test_embedding)
+                self.logger.info(
+                    f'Embedding server ready (model={self.model_name}, '
+                    f'dim={self._detected_dim})'
+                )
+                return
+            except Exception as e:
+                if attempt == max_retries:
+                    self.logger.error(
+                        f'Failed to connect after {max_retries} attempts: {e}'
+                    )
+                    self.logger.error(traceback.format_exc())
+                    raise
+                self.logger.warning(
+                    f'Server not ready ({e}), retrying in {retry_interval}s...'
+                )
+                time.sleep(retry_interval)
 
-            # Get target dimension for MRL-capable models (like jina-embeddings-v3)
-            target_dim = self.expected_dim or EMBEDDING_MODEL_DIMS.get(self.model_name)
-
-            model_kwargs = {'trust_remote_code': True}
-            if target_dim:
-                model_kwargs['truncate_dim'] = target_dim
-
-            self.model = HuggingFaceEmbeddings(
-                model_name=self.model_name,
-                model_kwargs=model_kwargs,
+    def _request(self, text: str) -> list[float]:
+        if self._client is None:
+            raise RuntimeError(
+                'Embedding service not connected. Call load_model() first.'
             )
+        response = self._client.post('/v1/embeddings', json={
+            'model': self.model_name,
+            'input': text,
+        })
+        response.raise_for_status()
+        return response.json()['data'][0]['embedding']
 
-            self._detect_dimension()
+    def encode_document(self, text: str) -> list[float]:
+        """Encode a document (caption) without instruction prefix."""
+        return self._request(text)
 
-            self.logger.info(
-                f'Embedding model loaded (output dim: {self.embedding_dimension})')
-        except Exception as e:
-            self.logger.error(f'Failed to load embedding model: {e}')
-            self.logger.error(traceback.format_exc())
-            raise
-
-    def _detect_dimension(self) -> None:
-        """Detect actual embedding dimension from the model."""
-        if self.expected_dim > 0:
-            self._detected_dim = self.expected_dim
-            self.logger.info(f'Using configured embedding dimension: {self.expected_dim}')
-            return
-
-        known_dim = EMBEDDING_MODEL_DIMS.get(self.model_name)
-        if known_dim:
-            self._detected_dim = known_dim
-            self.logger.info(f'Using known embedding dimension for {self.model_name}: {known_dim}')
-            return
-
-        self.logger.info('Detecting embedding dimension from model...')
-        test_embedding = self.model.embed_query("dimension test")
-        self._detected_dim = len(test_embedding)
-        self.logger.info(f'Detected embedding dimension: {self._detected_dim}')
-
-    def encode(self, text: str) -> list[float]:
-        """Generate embeddings for text."""
-        if self.model is None:
-            raise RuntimeError("Embedding model not loaded. Call load_model() first.")
-        return self.model.embed_query(text)
+    def encode_query(self, text: str) -> list[float]:
+        """Encode a search query with retrieval instruction prefix."""
+        return self._request(
+            f'Instruct: {RETRIEVAL_INSTRUCTION}\nQuery:{text}'
+        )
 
     @property
     def embedding_dimension(self) -> int:
-        """Get embedding dimension."""
+        """Get detected embedding dimension."""
         if self._detected_dim is None:
-            raise RuntimeError("Embedding dimension not detected. Call load_model() first.")
+            raise RuntimeError(
+                'Embedding dimension not available. Call load_model() first.'
+            )
         return self._detected_dim
 
     def cleanup(self) -> None:
-        """Release model resources."""
-        if self.model:
-            del self.model
-            self.model = None
+        """Close HTTP client connection."""
+        if self._client:
+            self._client.close()
+            self._client = None
             self._detected_dim = None
-            self.logger.info('Embedding model resources released')
+            self.logger.info('Embedding service connection closed')
