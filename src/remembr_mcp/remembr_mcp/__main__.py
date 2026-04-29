@@ -31,6 +31,7 @@ def main() -> None:
     try:
         mcp.run()
     finally:
+        embed_svc.cleanup()
         ros_publisher.destroy()
         rclpy.shutdown()
 
