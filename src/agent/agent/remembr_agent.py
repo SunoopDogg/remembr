@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from milvus.config import DatabaseConfig
+from qdrant.config import DatabaseConfig
 from agent_msgs.srv import Query
 
 from .config import AgentConfig
@@ -34,10 +34,10 @@ class ReMEmbRAgentNode(Node):
         self._db_config.validate()
 
         self.get_logger().info(f'Agent model: {self._config.model}')
-        self.get_logger().info(f'Database path: {self._db_config.db_path}')
+        self.get_logger().info(f'Qdrant URL: {self._db_config.qdrant_url}')
 
         # Initialize services
-        self._milvus_service = None
+        self._qdrant_service = None
         self._embedding_service = None
         self._search_service = None
         self._agent = None
@@ -55,7 +55,7 @@ class ReMEmbRAgentNode(Node):
     def _initialize_services(self) -> None:
         """Initialize all services."""
         try:
-            self._milvus_service, self._embedding_service, self._search_service = (
+            self._qdrant_service, self._embedding_service, self._search_service = (
                 create_services(self._db_config, self.get_logger())
             )
 
@@ -69,8 +69,8 @@ class ReMEmbRAgentNode(Node):
 
     def _cleanup_services(self) -> None:
         """Clean up any partially initialized services."""
-        cleanup_services(self._milvus_service, self._embedding_service, self.get_logger())
-        self._milvus_service = None
+        cleanup_services(self._qdrant_service, self._embedding_service, self.get_logger())
+        self._qdrant_service = None
         self._embedding_service = None
         self._search_service = None
         self._agent = None
