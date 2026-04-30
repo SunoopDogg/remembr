@@ -24,7 +24,7 @@ class TestDatabaseConfig:
     def test_default_embedding_model(self):
         from qdrant.config.database_config import DatabaseConfig
         config = DatabaseConfig()
-        assert config.embedding_model == 'Qwen/Qwen3-Embedding-8B'
+        assert config.embedding_model == 'Qwen/Qwen3-Embedding-4B'
 
     def test_validate_empty_collection_raises(self):
         from qdrant.config.database_config import DatabaseConfig

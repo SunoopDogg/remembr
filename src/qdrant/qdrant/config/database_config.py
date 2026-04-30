@@ -13,7 +13,7 @@ class DatabaseConfig:
 
     qdrant_url: str = 'http://localhost:6333'
     collection_name: str = 'robot_memories'
-    embedding_model: str = 'Qwen/Qwen3-Embedding-8B'
+    embedding_model: str = 'Qwen/Qwen3-Embedding-4B'
     embedding_url: str = 'http://localhost:8080'
     input_topic: str = '/caption_with_pose'
     max_id_length: int = 1000
