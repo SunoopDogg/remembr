@@ -268,3 +268,6 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# ReMEmbR local data
+remembr/

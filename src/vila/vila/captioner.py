@@ -11,11 +11,11 @@ from nav_msgs.msg import Odometry
 
 from .config import CaptionerConfig
 from .models import ImageSegment
-from .services import VilaService, ImageService, OdomService, PoseService
+from .services import GemmaService, ImageService, OdomService, PoseService
 
 
 class Captioner(Node):
-    """ROS2 node for VILA image captioning with pose."""
+    """ROS2 node for Gemma 4 image captioning with pose."""
 
     def __init__(self) -> None:
         super().__init__('captioner')
@@ -24,9 +24,9 @@ class Captioner(Node):
         self._config = CaptionerConfig.from_ros_node(self)
 
         # Initialize services
-        self._vila_service = VilaService(
-            self._config.model_path,
-            self._config.conv_mode,
+        self._gemma_service = GemmaService(
+            self._config.model_name,
+            self._config.vlm_base_url,
             self.get_logger(),
         )
         self._image_service = ImageService(
@@ -42,8 +42,8 @@ class Captioner(Node):
         self._setup_subscribers()
         self._setup_publishers()
 
-        # Load VILA model
-        self._vila_service.load_model()
+        # Connect to Gemma vLLM server
+        self._gemma_service.load_model()
 
         # Thread pool for async processing
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
@@ -166,19 +166,19 @@ class Captioner(Node):
         segment: ImageSegment,
         odom_buffer: List[Tuple[float, float, float, float]],
     ) -> None:
-        """Process image segment with VILA inference."""
+        """Process image segment with Gemma inference."""
         try:
             self.get_logger().info(
                 f"Processing segment with {segment.image_count} images"
             )
 
             # Generate caption
-            self.get_logger().info("Generating caption with VILA...")
-            caption = self._vila_service.generate_caption(
+            self.get_logger().info("Generating caption with Gemma...")
+            caption = self._gemma_service.generate_caption(
                 list(segment.images),
                 self._config.prompt_text,
                 self._config.temperature,
-                self._config.max_new_tokens,
+                self._config.max_tokens,
             )
 
             # Log caption preview
@@ -229,7 +229,7 @@ class Captioner(Node):
             self._caption_pose_pub.publish(msg)
 
         except Exception as e:
-            self._log_exception("VILA inference", e)
+            self._log_exception("Gemma inference", e)
 
     def destroy_node(self) -> None:
         """Clean up resources before node shutdown."""
@@ -240,6 +240,7 @@ class Captioner(Node):
         except Exception as e:
             self._log_exception("executor shutdown", e)
         finally:
+            self._gemma_service.cleanup()
             super().destroy_node()
 
 
