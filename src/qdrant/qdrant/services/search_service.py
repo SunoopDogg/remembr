@@ -91,19 +91,19 @@ class SearchService:
         if not results:
             return f'No memories found for query: {query_info}'
 
-        output = ''
+        parts = []
         for idx, doc in enumerate(results):
             actual_timestamp = doc.get('time', 0.0) + TIMESTAMP_NORMALIZATION_EPOCH
             time_str = strftime('%Y-%m-%d %H:%M:%S', localtime(actual_timestamp))
             position = doc.get('position', [0.0, 0.0, 0.0])
             pos_str = f'[{position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f}]'
 
-            output += (
+            parts.append(
                 f"[Result {idx + 1}]\n"
                 f"  POSITION: {pos_str}\n"
                 f"  ORIENTATION: {doc.get('orientation', 0.0):.3f} radians\n"
                 f"  TIME: {time_str}\n"
-                f"  DESCRIPTION: {doc.get('text', '')}\n\n"
+                f"  DESCRIPTION: {doc.get('text', '')}"
             )
 
-        return output.strip()
+        return '\n\n'.join(parts)

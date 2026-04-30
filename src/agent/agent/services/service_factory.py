@@ -29,11 +29,9 @@ def cleanup_services(qdrant_service, embedding_service, logger: Logger) -> None:
         try:
             qdrant_service.close()
         except Exception as e:
-            if logger:
-                logger.warning(f"Failed to close Qdrant service: {e}")
+            logger.warning(f"Failed to close Qdrant service: {e}")
     if embedding_service:
         try:
             embedding_service.cleanup()
         except Exception as e:
-            if logger:
-                logger.warning(f"Failed to cleanup embedding service: {e}")
+            logger.warning(f"Failed to cleanup embedding service: {e}")

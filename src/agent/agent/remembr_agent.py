@@ -28,7 +28,6 @@ class ReMEmbRAgentNode(Node):
 
         self._query_count = 0
 
-        # Load configuration from ROS2 parameters
         self._config = AgentConfig.from_ros_node(self)
         self._db_config = DatabaseConfig.from_ros_node(self)
         self._db_config.validate()
@@ -36,7 +35,6 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().info(f'Agent model: {self._config.model}')
         self.get_logger().info(f'Qdrant URL: {self._db_config.qdrant_url}')
 
-        # Initialize services
         self._qdrant_service = None
         self._embedding_service = None
         self._search_service = None
@@ -77,7 +75,6 @@ class ReMEmbRAgentNode(Node):
 
     def _setup_ros_interfaces(self) -> None:
         """Setup ROS2 service and topic interfaces."""
-        # Query service
         self._query_service = self.create_service(
             Query,
             '~/query',
@@ -85,7 +82,6 @@ class ReMEmbRAgentNode(Node):
         )
         self.get_logger().info(f'Query service: {self.get_name()}/query')
 
-        # Status service
         self._status_service = self.create_service(
             Trigger,
             '~/status',
@@ -93,7 +89,6 @@ class ReMEmbRAgentNode(Node):
         )
         self.get_logger().info(f'Status service: {self.get_name()}/status')
 
-        # Topic-based query interface
         self._query_subscriber = self.create_subscription(
             String,
             '~/query_topic',
@@ -108,7 +103,6 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().info(f'Query topic: {self.get_name()}/query_topic')
         self.get_logger().info(f'Response topic: {self.get_name()}/response_topic')
 
-        # Goal pose publisher for navigation
         self._goal_pose_publisher = self.create_publisher(
             PoseStamped,
             '/goal_pose',
@@ -144,7 +138,6 @@ class ReMEmbRAgentNode(Node):
         """Handle query from topic."""
         result = self._execute_query(msg.data)
 
-        # Publish response as JSON
         response_msg = String()
         response_msg.data = json.dumps(result, default=str)
         self._response_publisher.publish(response_msg)
