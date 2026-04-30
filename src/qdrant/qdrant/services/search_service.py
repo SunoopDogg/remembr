@@ -99,7 +99,7 @@ class SearchService:
             pos_str = f'[{position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f}]'
 
             output += (
-                f"[Result {idx + 1}] (relevance_score: {doc.get('distance', 0.0):.4f})\n"
+                f"[Result {idx + 1}]\n"
                 f"  POSITION: {pos_str}\n"
                 f"  ORIENTATION: {doc.get('orientation', 0.0):.3f} radians\n"
                 f"  TIME: {time_str}\n"
