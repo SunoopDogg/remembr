@@ -6,14 +6,13 @@ from typing import Optional
 import rclpy
 from rclpy.node import Node
 
-from vila_msgs.msg import CaptionWithPose
+from memory_msgs.msg import CaptionWithPose
 
 from .config import DatabaseConfig
-from .services import QdrantService, EmbeddingService, DataPipeline, SearchService
+from .services import QdrantService, EmbeddingService, DataPipeline
 
 
 class MemoryBuilder(Node):
-    """ROS2 node for storing VILA captions in Qdrant vector database."""
 
     def __init__(self, reset_db: bool = False) -> None:
         super().__init__('memory_builder')
@@ -37,7 +36,6 @@ class MemoryBuilder(Node):
         )
         self._qdrant_service = None
         self._data_pipeline = None
-        self._search_service = None
 
         self._initialize_services(reset_db)
 
@@ -51,11 +49,9 @@ class MemoryBuilder(Node):
         self.get_logger().info('Memory Builder node initialized successfully')
         self.get_logger().info(f'Waiting for caption data on {self._config.input_topic}...')
 
-    def _log_error(self, context: str, error: Exception, reraise: bool = True) -> None:
-        self.get_logger().error(f'{context}: {error}')
+    def _log_exception(self, context: str, exc: Exception) -> None:
+        self.get_logger().error(f'{context}: {exc}')
         self.get_logger().error(traceback.format_exc())
-        if reraise:
-            raise
 
     def _initialize_services(self, reset_db: bool) -> None:
         try:
@@ -80,15 +76,9 @@ class MemoryBuilder(Node):
 
             self._data_pipeline = DataPipeline(self._embedding_service)
 
-            self._search_service = SearchService(
-                self._qdrant_service,
-                self._embedding_service,
-                self.get_logger(),
-            )
-            self.get_logger().info('Search service initialized')
-
         except Exception as e:
-            self._log_error('Service initialization failed', e)
+            self._log_exception('Service initialization failed', e)
+            raise
 
     def caption_callback(self, msg: CaptionWithPose) -> None:
         try:
@@ -108,7 +98,7 @@ class MemoryBuilder(Node):
             self._store_to_qdrant(msg)
 
         except Exception as e:
-            self._log_error('Error in caption callback', e, reraise=False)
+            self._log_exception('Error in caption callback', e)
 
     def _store_to_qdrant(self, msg: CaptionWithPose) -> None:
         try:
@@ -121,11 +111,7 @@ class MemoryBuilder(Node):
             )
 
         except Exception as e:
-            self._log_error('Failed to store to Qdrant', e, reraise=False)
-
-    @property
-    def search_service(self) -> SearchService:
-        return self._search_service
+            self._log_exception('Failed to store to Qdrant', e)
 
     def destroy_node(self) -> None:
         self.get_logger().info('Cleaning up resources...')
@@ -143,9 +129,6 @@ class MemoryBuilder(Node):
                 self.get_logger().info('Embedding service cleaned up')
             except Exception as e:
                 self.get_logger().warning(f'Error cleaning up embedding service: {e}')
-
-        if self._data_pipeline is not None:
-            del self._data_pipeline
 
         super().destroy_node()
 

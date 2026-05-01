@@ -86,7 +86,7 @@ class QdrantService:
             raise
 
     def search(self, vector: list, using: str, limit: int) -> list:
-        """Execute Named Vector search; using must be TEXT_VECTOR / POSITION_VECTOR / TIME_VECTOR."""
+        """Query named vector index; using must be one of the named vector constants."""
         return self.client.query_points(
             collection_name=self.config.collection_name,
             query=vector,

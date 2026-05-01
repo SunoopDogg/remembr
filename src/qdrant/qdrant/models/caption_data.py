@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from vila_msgs.msg import CaptionWithPose
+from memory_msgs.msg import CaptionWithPose
 
 
 @dataclass(frozen=True, slots=True)

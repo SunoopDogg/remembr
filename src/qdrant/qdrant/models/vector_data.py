@@ -26,7 +26,8 @@ class VectorData:
             caption_data.position_z,
         ]
 
-        timestamp_seconds = float(caption_data.timestamp_sec) + (caption_data.timestamp_nanosec * 1e-9)
+        nanosec_offset = caption_data.timestamp_nanosec * 1e-9
+        timestamp_seconds = float(caption_data.timestamp_sec) + nanosec_offset
         normalized_time = timestamp_seconds - TIMESTAMP_NORMALIZATION_EPOCH
 
         return cls(

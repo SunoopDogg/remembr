@@ -1,4 +1,4 @@
-from vila_msgs.msg import CaptionWithPose
+from memory_msgs.msg import CaptionWithPose
 
 from ..models.caption_data import CaptionData
 from ..models.vector_data import VectorData
