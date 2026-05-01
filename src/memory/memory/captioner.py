@@ -80,21 +80,21 @@ class Captioner(Node):
             f"CaptionWithPose publisher created on {self._config.output_topic}"
         )
 
-    def _compressed_image_callback(self, msg: CompressedImage) -> None:
+    def _handle_image_msg(self, convert_fn, context: str, msg) -> None:
         try:
-            pil_image = self._image_service.convert_compressed_to_pil(msg)
+            pil_image = convert_fn(msg)
             current_time = self._image_service.get_timestamp(msg)
             self._process_image(pil_image, current_time)
         except Exception as e:
-            self._log_exception("compressed_image_callback", e)
+            self._log_exception(context, e)
+
+    def _compressed_image_callback(self, msg: CompressedImage) -> None:
+        self._handle_image_msg(
+            self._image_service.convert_compressed_to_pil, "compressed_image_callback", msg
+        )
 
     def _raw_image_callback(self, msg: Image) -> None:
-        try:
-            pil_image = self._image_service.convert_raw_to_pil(msg)
-            current_time = self._image_service.get_timestamp(msg)
-            self._process_image(pil_image, current_time)
-        except Exception as e:
-            self._log_exception("raw_image_callback", e)
+        self._handle_image_msg(self._image_service.convert_raw_to_pil, "raw_image_callback", msg)
 
     def _process_image(self, pil_image, current_time: float) -> None:
         if self._segment_window_start is None:
@@ -145,10 +145,6 @@ class Captioner(Node):
         odom_buffer: List[Tuple[float, float, float, float]],
     ) -> None:
         try:
-            self.get_logger().info(
-                f"Processing segment with {segment.image_count} images"
-            )
-
             caption = self._gemma_service.generate_caption(
                 segment.images,
                 self._config.prompt_text,
@@ -202,7 +198,6 @@ class Captioner(Node):
         try:
             self.get_logger().info("Shutting down ThreadPoolExecutor...")
             self._executor.shutdown(wait=True, cancel_futures=False)
-            self.get_logger().info("ThreadPoolExecutor shutdown complete")
         except Exception as e:
             self._log_exception("executor shutdown", e)
         finally:
