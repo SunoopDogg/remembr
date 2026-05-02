@@ -4,8 +4,8 @@
   <name>memory</name>
   <version>0.0.0</version>
   <description>ReMEmbR memory building node (VLM captioner + pose)</description>
-  <maintainer email="aswoo55555@gmail.com">airo-workstation</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="root@todo.todo">root</maintainer>
+  <license>TODO: License declaration</license>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>cv_bridge</exec_depend>

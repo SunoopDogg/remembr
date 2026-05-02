@@ -1,5 +1,6 @@
 import threading
-from typing import List, Tuple, Optional
+from collections import deque
+from typing import List, Optional, Tuple
 
 from nav_msgs.msg import Odometry
 
@@ -10,9 +11,8 @@ from ..utils.protocols import Logger
 class OdomService:
 
     def __init__(self, max_buffer_size: int, logger: Logger) -> None:
-        self._max_buffer_size = max_buffer_size
         self._logger = logger
-        self._buffer: List[Tuple[float, float, float, float]] = []
+        self._buffer: deque = deque(maxlen=max_buffer_size)
         self._last_pose: Optional[PoseData] = None
         self._lock = threading.Lock()
 
@@ -28,14 +28,12 @@ class OdomService:
 
     def add_to_buffer(self, pose: PoseData) -> None:
         with self._lock:
-            if len(self._buffer) >= self._max_buffer_size:
-                self._buffer.pop(0)
             self._buffer.append(pose.as_tuple())
             self._last_pose = pose
 
     def flush_buffer(self) -> List[Tuple[float, float, float, float]]:
         with self._lock:
-            buffer_copy = self._buffer.copy()
+            buffer_copy = list(self._buffer)
             self._buffer.clear()
             return buffer_copy
 

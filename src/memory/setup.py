@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'captioner = memory.captioner:main',
+            'captioner_once = memory.captioner_once:main',
         ],
     },
 )

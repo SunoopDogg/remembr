@@ -1,4 +1,5 @@
 import threading
+from collections import deque
 from typing import List, Tuple
 
 import cv2
@@ -14,10 +15,9 @@ from ..utils.timestamp_utils import ros_time_to_float
 class ImageService:
 
     def __init__(self, max_buffer_size: int, logger: Logger) -> None:
-        self._max_buffer_size = max_buffer_size
         self._logger = logger
         self._bridge = CvBridge()
-        self._buffer: List[Tuple[Image.Image, float]] = []
+        self._buffer: deque = deque(maxlen=max_buffer_size)
         self._lock = threading.Lock()
 
     def _cv_to_pil(self, cv_image) -> Image.Image:
@@ -36,10 +36,7 @@ class ImageService:
     def add_to_buffer(self, image: Image.Image, timestamp: float) -> bool:
         """Add image to buffer. Returns True if buffer was full and oldest dropped."""
         with self._lock:
-            was_full = False
-            if len(self._buffer) >= self._max_buffer_size:
-                self._buffer.pop(0)
-                was_full = True
+            was_full = len(self._buffer) == self._buffer.maxlen
             self._buffer.append((image, timestamp))
             return was_full
 

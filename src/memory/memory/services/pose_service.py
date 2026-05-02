@@ -1,8 +1,8 @@
 import statistics
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from builtin_interfaces.msg import Time
-
+from sensor_msgs.msg import CompressedImage as SensorCompressedImage
 from memory_msgs.msg import CaptionWithPose
 
 from ..models.pose_data import PoseData
@@ -21,6 +21,7 @@ class PoseService:
         caption: str,
         pose: PoseData,
         timestamp: Time,
+        images: Optional[List[SensorCompressedImage]] = None,
     ) -> CaptionWithPose:
         msg = CaptionWithPose()
         msg.caption = caption
@@ -29,6 +30,8 @@ class PoseService:
         msg.position_z = pose.z
         msg.theta = pose.theta
         msg.timestamp = timestamp
+        if images:
+            msg.images = images
         return msg
 
     @staticmethod

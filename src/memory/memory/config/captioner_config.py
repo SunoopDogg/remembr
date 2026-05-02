@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, slots=True)
 class CaptionerConfig:
 
-    model_name: str = 'google/gemma-4-26B-A4B-it'
-    vlm_base_url: str = 'http://localhost:8000'
+    model_name: str = 'gemma-4'
+    vlm_base_url: str = 'http://192.168.0.151:8000'
     prompt_text: str = 'Describe what you see in these images.'
     segment_time: float = 3.0
     compressed_image_topic: str = '/camera/camera/color/image_raw/compressed'
@@ -17,6 +17,7 @@ class CaptionerConfig:
     odom_topic: str = '/odom'
     output_topic: str = '/caption_with_pose'
     max_buffer_size: int = 90
+    max_caption_frames: int = 10
     temperature: float = 0.2
     max_tokens: int = 512
 
@@ -36,6 +37,7 @@ class CaptionerConfig:
         node.declare_parameter('odom_topic', defaults['odom_topic'])
         node.declare_parameter('output_topic', defaults['output_topic'])
         node.declare_parameter('max_buffer_size', defaults['max_buffer_size'])
+        node.declare_parameter('max_caption_frames', defaults['max_caption_frames'])
         node.declare_parameter('temperature', defaults['temperature'])
         node.declare_parameter('max_tokens', defaults['max_tokens'])
 

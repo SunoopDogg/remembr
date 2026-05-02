@@ -9,7 +9,10 @@ from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 from nav_msgs.msg import Odometry
 
+from memory_msgs.msg import CaptionWithPose
+
 from .config import CaptionerConfig
+from .utils import pil_to_jpeg_bytes
 from .models import ImageSegment
 from .services import GemmaService, ImageService, OdomService, PoseService
 
@@ -69,8 +72,6 @@ class Captioner(Node):
         )
 
     def _setup_publishers(self) -> None:
-        from memory_msgs.msg import CaptionWithPose
-
         self._caption_pose_pub = self.create_publisher(
             CaptionWithPose,
             self._config.output_topic,
@@ -139,14 +140,30 @@ class Captioner(Node):
             f"Segment submission time: {after_time - before_time:.4f} seconds"
         )
 
+    @staticmethod
+    def _jpeg_to_compressed(jpeg_bytes: bytes) -> CompressedImage:
+        ros_img = CompressedImage()
+        ros_img.format = 'jpeg'
+        ros_img.data = jpeg_bytes
+        return ros_img
+
+    @staticmethod
+    def _sample_frames(images, k: int):
+        if len(images) <= k:
+            return images
+        indices = [round(i * (len(images) - 1) / (k - 1)) for i in range(k)]
+        return [images[i] for i in indices]
+
     def _process_segment(
         self,
         segment: ImageSegment,
         odom_buffer: List[Tuple[float, float, float, float]],
     ) -> None:
         try:
+            sampled_images = self._sample_frames(segment.images, self._config.max_caption_frames)
+            jpeg_bytes = [pil_to_jpeg_bytes(img) for img in sampled_images]
             caption = self._gemma_service.generate_caption(
-                segment.images,
+                jpeg_bytes,
                 self._config.prompt_text,
                 self._config.temperature,
                 self._config.max_tokens,
@@ -188,6 +205,7 @@ class Captioner(Node):
                 caption,
                 pose,
                 timestamp,
+                [self._jpeg_to_compressed(jb) for jb in jpeg_bytes],
             )
             self._caption_pose_pub.publish(msg)
 

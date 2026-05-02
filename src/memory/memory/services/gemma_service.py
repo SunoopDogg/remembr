@@ -5,8 +5,6 @@ import traceback
 from typing import List
 
 import httpx
-from PIL import Image
-
 from ..utils.protocols import Logger
 
 
@@ -43,15 +41,13 @@ class GemmaService:
                 time.sleep(retry_interval)
 
     @staticmethod
-    def _pil_to_data_url(image: Image.Image) -> str:
-        buf = io.BytesIO()
-        image.save(buf, format='JPEG')
-        b64 = base64.b64encode(buf.getvalue()).decode()
+    def _jpeg_to_data_url(jpeg_bytes: bytes) -> str:
+        b64 = base64.b64encode(jpeg_bytes).decode()
         return f'data:image/jpeg;base64,{b64}'
 
     def generate_caption(
         self,
-        images: List[Image.Image],
+        images: List[bytes],
         prompt: str,
         temperature: float = 0.2,
         max_tokens: int = 512,
@@ -62,7 +58,7 @@ class GemmaService:
         content = [
             {
                 'type': 'image_url',
-                'image_url': {'url': self._pil_to_data_url(img)},
+                'image_url': {'url': self._jpeg_to_data_url(img)},
             }
             for img in images
         ]
