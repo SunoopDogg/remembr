@@ -61,7 +61,7 @@ class ReMEmbRAgent:
 
     def set_search_service(self, search_service: SearchService) -> None:
         """Bind a search service and build the agent graph."""
-        tools = create_search_tools(search_service)
+        tools = create_search_tools(search_service, self.config.novelty_weight)
         self._nodes = GraphNodes(self.llm, self.config, self.prompts, tools)
         self.graph = build_agent_graph(self._nodes, tools)
 

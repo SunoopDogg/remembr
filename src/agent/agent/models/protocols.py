@@ -17,6 +17,7 @@ class SearchResult(TypedDict):
     orientation: float
     time: float
     distance: float
+    novelty_score: float
 
 
 class SearchService(Protocol):

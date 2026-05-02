@@ -2,6 +2,7 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from ..models.protocols import SearchService
+from ..utils.ranking_utils import rerank_by_novelty
 
 
 class TextSearchInput(BaseModel):
@@ -23,10 +24,17 @@ class TimeSearchInput(BaseModel):
 
 def create_search_tools(
     search_service: SearchService,
+    novelty_weight: float = 0.0,
 ) -> list[StructuredTool]:
     """Create search tools bound to a SearchService instance."""
+
+    def _format(results, query_info):
+        if novelty_weight > 0.0:
+            results = rerank_by_novelty(results, novelty_weight)
+        return search_service.format_results(results, query_info)
+
     text_search_tool = StructuredTool.from_function(
-        func=lambda query: search_service.format_results(
+        func=lambda query: _format(
             search_service.search_by_text(query), f"text: {query}"
         ),
         name="retrieve_from_text",
@@ -35,8 +43,9 @@ def create_search_tools(
     )
 
     position_search_tool = StructuredTool.from_function(
-        func=lambda position: search_service.format_results(
-            search_service.search_by_position(position), f"position: {position}"
+        func=lambda position: _format(
+            search_service.search_by_position(position),
+            f"position: {position}",
         ),
         name="retrieve_from_position",
         description="Search video memory by (x,y,z) position",
@@ -44,7 +53,7 @@ def create_search_tools(
     )
 
     time_search_tool = StructuredTool.from_function(
-        func=lambda time_str: search_service.format_results(
+        func=lambda time_str: _format(
             search_service.search_by_time(time_str), f"time: {time_str}"
         ),
         name="retrieve_from_time",
