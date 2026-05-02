@@ -13,11 +13,12 @@ class DatabaseConfig:
 
     qdrant_url: str = 'http://localhost:6333'
     collection_name: str = 'robot_memories'
-    embedding_model: str = 'Qwen/Qwen3-Embedding-4B'
-    embedding_url: str = 'http://localhost:8080'
+    embedding_model: str = 'qwen3-embedding-4b'
+    embedding_url: str = 'http://192.168.0.152:8080'
     input_topic: str = '/caption_with_pose'
     max_id_length: int = 1000
     max_caption_length: int = 3000
+    images_dir: str = '/root/remembr/src/qdrant/db/images'
 
     @classmethod
     def from_ros_node(cls, node: 'Node') -> 'DatabaseConfig':
@@ -32,6 +33,7 @@ class DatabaseConfig:
         node.declare_parameter('embedding_model', defaults['embedding_model'])
         node.declare_parameter('embedding_url', defaults['embedding_url'])
         node.declare_parameter('input_topic', defaults['input_topic'])
+        node.declare_parameter('images_dir', defaults['images_dir'])
 
         return cls(
             qdrant_url=node.get_parameter('qdrant_url').value,
@@ -39,6 +41,7 @@ class DatabaseConfig:
             embedding_model=node.get_parameter('embedding_model').value,
             embedding_url=node.get_parameter('embedding_url').value,
             input_topic=node.get_parameter('input_topic').value,
+            images_dir=node.get_parameter('images_dir').value,
         )
 
     def validate(self) -> None:

@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 import sys
 import traceback
 from typing import Optional
@@ -9,7 +11,9 @@ from rclpy.node import Node
 from memory_msgs.msg import CaptionWithPose
 
 from .config import DatabaseConfig
-from .services import QdrantService, EmbeddingService, DataPipeline
+from .models.caption_data import CaptionData
+from .models.qdrant_record import QdrantMemoryRecord
+from .services import QdrantService, EmbeddingService
 
 
 class MemoryBuilder(Node):
@@ -35,7 +39,6 @@ class MemoryBuilder(Node):
             self.get_logger(),
         )
         self._qdrant_service = None
-        self._data_pipeline = None
 
         self._initialize_services(reset_db)
 
@@ -67,14 +70,15 @@ class MemoryBuilder(Node):
 
             if reset_db:
                 self._qdrant_service.reset_database()
+                if os.path.exists(self._config.images_dir):
+                    shutil.rmtree(self._config.images_dir)
+                    self.get_logger().info(f'Removed images: {self._config.images_dir}')
             else:
                 self._qdrant_service.setup_collection()
 
             self.get_logger().info(
                 f'Qdrant collection "{self._config.collection_name}" ready '
                 f'(embedding_dim={embedding_dim})')
-
-            self._data_pipeline = DataPipeline(self._embedding_service)
 
         except Exception as e:
             self._log_exception('Service initialization failed', e)
@@ -102,8 +106,11 @@ class MemoryBuilder(Node):
 
     def _store_to_qdrant(self, msg: CaptionWithPose) -> None:
         try:
-            record = self._data_pipeline.process_ros_message(msg)
+            caption_data = CaptionData.from_ros_msg(msg)
+            text_embedding = self._embedding_service.encode_document(caption_data.caption)
+            record = QdrantMemoryRecord.from_caption_data(caption_data, text_embedding)
             self._qdrant_service.upsert_record(record)
+            self._save_images(record.id, [img.data for img in msg.images])
 
             self.get_logger().info(
                 f'Stored to Qdrant: "{record.caption[:50]}..." '
@@ -112,6 +119,14 @@ class MemoryBuilder(Node):
 
         except Exception as e:
             self._log_exception('Failed to store to Qdrant', e)
+
+    def _save_images(self, record_id: str, images: list) -> None:
+        out_dir = os.path.join(self._config.images_dir, record_id)
+        os.makedirs(out_dir, exist_ok=True)
+        for i, data in enumerate(images):
+            with open(os.path.join(out_dir, f'image_{i}.jpg'), 'wb') as f:
+                f.write(data)
+        self.get_logger().info(f'Saved {len(images)} images to {out_dir}')
 
     def destroy_node(self) -> None:
         self.get_logger().info('Cleaning up resources...')

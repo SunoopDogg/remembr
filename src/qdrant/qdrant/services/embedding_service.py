@@ -12,36 +12,36 @@ class EmbeddingService:
     """HTTP client for vLLM embedding server."""
 
     def __init__(self, model_name: str, base_url: str, logger: Logger) -> None:
-        self.model_name = model_name
-        self.base_url = base_url
-        self.logger = logger
+        self._model_name = model_name
+        self._base_url = base_url
+        self._logger = logger
         self._client: httpx.Client | None = None
         self._detected_dim: int | None = None
 
     def load_model(self, max_retries: int = 30, retry_interval: float = 5.0) -> None:
         """Connect to vLLM server and detect embedding dimension with retry."""
-        self._client = httpx.Client(base_url=self.base_url, timeout=30.0)
+        self._client = httpx.Client(base_url=self._base_url, timeout=30.0)
         for attempt in range(1, max_retries + 1):
             try:
-                self.logger.info(
-                    f'Connecting to embedding server at {self.base_url} '
+                self._logger.info(
+                    f'Connecting to embedding server at {self._base_url} '
                     f'(attempt {attempt}/{max_retries})...'
                 )
                 test_embedding = self.encode_document('dimension test')
                 self._detected_dim = len(test_embedding)
-                self.logger.info(
-                    f'Embedding server ready (model={self.model_name}, '
+                self._logger.info(
+                    f'Embedding server ready (model={self._model_name}, '
                     f'dim={self._detected_dim})'
                 )
                 return
             except Exception as e:
                 if attempt == max_retries:
-                    self.logger.error(
+                    self._logger.error(
                         f'Failed to connect after {max_retries} attempts: {e}'
                     )
-                    self.logger.error(traceback.format_exc())
+                    self._logger.error(traceback.format_exc())
                     raise
-                self.logger.warning(
+                self._logger.warning(
                     f'Server not ready ({e}), retrying in {retry_interval}s...'
                 )
                 time.sleep(retry_interval)
@@ -52,7 +52,7 @@ class EmbeddingService:
                 'Embedding service not connected. Call load_model() first.'
             )
         response = self._client.post('/v1/embeddings', json={
-            'model': self.model_name,
+            'model': self._model_name,
             'input': text,
         })
         response.raise_for_status()
@@ -83,4 +83,4 @@ class EmbeddingService:
             self._client.close()
             self._client = None
             self._detected_dim = None
-            self.logger.info('Embedding service connection closed')
+            self._logger.info('Embedding service connection closed')

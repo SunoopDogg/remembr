@@ -17,20 +17,20 @@ class SearchService:
         embedding_service: EmbeddingService,
         logger: Logger,
     ) -> None:
-        self.qdrant_service = qdrant_service
-        self.embedding_service = embedding_service
-        self.logger = logger
+        self._qdrant_service = qdrant_service
+        self._embedding_service = embedding_service
+        self._logger = logger
 
     def _execute_search(self, data: list, using: str, limit: int) -> list[dict]:
-        results = self.qdrant_service.search(vector=data, using=using, limit=limit)
+        results = self._qdrant_service.search(vector=data, using=using, limit=limit)
         return self._process_search_results(results)
 
     def search_by_text(self, query: str, limit: int = 10) -> list[dict]:
         try:
-            query_embedding = self.embedding_service.encode_query(query)
+            query_embedding = self._embedding_service.encode_query(query)
             return self._execute_search(query_embedding, TEXT_VECTOR, limit)
         except Exception as e:
-            self.logger.error(f'Error in search_by_text: {e}')
+            self._logger.error(f'Error in search_by_text: {e}')
             return []
 
     def search_by_position(self, position: Tuple, limit: int = 10) -> list[dict]:
@@ -42,7 +42,7 @@ class SearchService:
         except ValueError:
             raise
         except Exception as e:
-            self.logger.error(f'Error in search_by_position: {e}')
+            self._logger.error(f'Error in search_by_position: {e}')
             return []
 
     def search_by_time(self, time_str: str, limit: int = 10) -> list[dict]:
@@ -52,7 +52,7 @@ class SearchService:
         except ValueError:
             raise
         except Exception as e:
-            self.logger.error(f'Error in search_by_time: {e}')
+            self._logger.error(f'Error in search_by_time: {e}')
             return []
 
     def _parse_time_string(self, time_str: str) -> float:
