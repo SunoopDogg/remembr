@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from qdrant_client.models import PointStruct
 
 from .caption_data import CaptionData
-from .vector_data import VectorData
+from ..config import TIMESTAMP_NORMALIZATION_EPOCH
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,18 +19,23 @@ class QdrantMemoryRecord:
     caption: str
 
     @classmethod
-    def from_caption_and_vectors(
+    def from_caption_data(
         cls,
         caption_data: CaptionData,
-        vector_data: VectorData,
+        text_embedding: list[float],
     ) -> 'QdrantMemoryRecord':
-        """Create record from caption and vector data."""
+        position = [caption_data.position_x, caption_data.position_y, caption_data.position_z]
+        normalized_time = (
+            float(caption_data.timestamp_sec)
+            + caption_data.timestamp_nanosec * 1e-9
+            - TIMESTAMP_NORMALIZATION_EPOCH
+        )
         return cls(
             id=str(uuid.uuid4()),
-            text_embedding=vector_data.text_embedding,
-            position=vector_data.position_vector,
-            theta=vector_data.theta,
-            time=vector_data.time,
+            text_embedding=text_embedding,
+            position=position,
+            theta=caption_data.theta,
+            time=[normalized_time, 0.0],
             caption=caption_data.caption,
         )
 

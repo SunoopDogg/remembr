@@ -24,7 +24,7 @@ class TestDatabaseConfig:
     def test_default_embedding_model(self):
         from qdrant.config.database_config import DatabaseConfig
         config = DatabaseConfig()
-        assert config.embedding_model == 'Qwen/Qwen3-Embedding-8B'
+        assert config.embedding_model == 'Qwen/Qwen3-Embedding-4B'
 
     def test_validate_empty_collection_raises(self):
         from qdrant.config.database_config import DatabaseConfig
@@ -301,6 +301,38 @@ class TestSearchService:
         service = self._make_service()
         result = service.format_results([], 'test query')
         assert 'No memories found' in result
+
+    def test_format_results_no_score(self):
+        service = self._make_service()
+        doc = {
+            'text': 'robot sees the kitchen',
+            'position': [1.0, 2.0, 0.0],
+            'orientation': 0.5,
+            'time': 100.0,
+            'distance': 0.9876,
+        }
+        result = service.format_results([doc], 'test')
+        assert 'relevance_score' not in result
+        assert '0.9876' not in result
+        assert 'POSITION' in result
+        assert 'DESCRIPTION' in result
+        assert 'robot sees the kitchen' in result
+
+    def test_format_results_includes_required_fields(self):
+        service = self._make_service()
+        doc = {
+            'text': 'a red door',
+            'position': [3.14, 2.71, 0.0],
+            'orientation': 1.57,
+            'time': 0.0,
+            'distance': 0.5,
+        }
+        result = service.format_results([doc])
+        assert '[Result 1]' in result
+        assert 'POSITION' in result
+        assert 'ORIENTATION' in result
+        assert 'TIME' in result
+        assert 'DESCRIPTION' in result
 
 
 class TestDataPipeline:

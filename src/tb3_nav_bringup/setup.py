@@ -42,8 +42,6 @@ setup(
         'test': ['pytest'],
     },
     entry_points={
-        'console_scripts': [
-            'waypoint_patrol = tb3_nav_bringup.waypoint_patrol:main',
-        ],
+        'console_scripts': [],
     },
 )

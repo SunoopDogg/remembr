@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from milvus.config import DatabaseConfig
+from qdrant.config import DatabaseConfig
 from agent_msgs.srv import Query
 
 from .config import AgentConfig
@@ -28,16 +28,14 @@ class ReMEmbRAgentNode(Node):
 
         self._query_count = 0
 
-        # Load configuration from ROS2 parameters
         self._config = AgentConfig.from_ros_node(self)
         self._db_config = DatabaseConfig.from_ros_node(self)
         self._db_config.validate()
 
         self.get_logger().info(f'Agent model: {self._config.model}')
-        self.get_logger().info(f'Database path: {self._db_config.db_path}')
+        self.get_logger().info(f'Qdrant URL: {self._db_config.qdrant_url}')
 
-        # Initialize services
-        self._milvus_service = None
+        self._qdrant_service = None
         self._embedding_service = None
         self._search_service = None
         self._agent = None
@@ -55,7 +53,7 @@ class ReMEmbRAgentNode(Node):
     def _initialize_services(self) -> None:
         """Initialize all services."""
         try:
-            self._milvus_service, self._embedding_service, self._search_service = (
+            self._qdrant_service, self._embedding_service, self._search_service = (
                 create_services(self._db_config, self.get_logger())
             )
 
@@ -69,15 +67,14 @@ class ReMEmbRAgentNode(Node):
 
     def _cleanup_services(self) -> None:
         """Clean up any partially initialized services."""
-        cleanup_services(self._milvus_service, self._embedding_service, self.get_logger())
-        self._milvus_service = None
+        cleanup_services(self._qdrant_service, self._embedding_service, self.get_logger())
+        self._qdrant_service = None
         self._embedding_service = None
         self._search_service = None
         self._agent = None
 
     def _setup_ros_interfaces(self) -> None:
         """Setup ROS2 service and topic interfaces."""
-        # Query service
         self._query_service = self.create_service(
             Query,
             '~/query',
@@ -85,7 +82,6 @@ class ReMEmbRAgentNode(Node):
         )
         self.get_logger().info(f'Query service: {self.get_name()}/query')
 
-        # Status service
         self._status_service = self.create_service(
             Trigger,
             '~/status',
@@ -93,7 +89,6 @@ class ReMEmbRAgentNode(Node):
         )
         self.get_logger().info(f'Status service: {self.get_name()}/status')
 
-        # Topic-based query interface
         self._query_subscriber = self.create_subscription(
             String,
             '~/query_topic',
@@ -108,7 +103,6 @@ class ReMEmbRAgentNode(Node):
         self.get_logger().info(f'Query topic: {self.get_name()}/query_topic')
         self.get_logger().info(f'Response topic: {self.get_name()}/response_topic')
 
-        # Goal pose publisher for navigation
         self._goal_pose_publisher = self.create_publisher(
             PoseStamped,
             '/goal_pose',
@@ -144,7 +138,6 @@ class ReMEmbRAgentNode(Node):
         """Handle query from topic."""
         result = self._execute_query(msg.data)
 
-        # Publish response as JSON
         response_msg = String()
         response_msg.data = json.dumps(result, default=str)
         self._response_publisher.publish(response_msg)

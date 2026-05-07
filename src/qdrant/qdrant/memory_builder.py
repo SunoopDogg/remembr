@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 import sys
 import traceback
 from typing import Optional
@@ -6,14 +8,15 @@ from typing import Optional
 import rclpy
 from rclpy.node import Node
 
-from vila_msgs.msg import CaptionWithPose
+from memory_msgs.msg import CaptionWithPose
 
 from .config import DatabaseConfig
-from .services import QdrantService, EmbeddingService, DataPipeline, SearchService
+from .models.caption_data import CaptionData
+from .models.qdrant_record import QdrantMemoryRecord
+from .services import QdrantService, EmbeddingService
 
 
 class MemoryBuilder(Node):
-    """ROS2 node for storing VILA captions in Qdrant vector database."""
 
     def __init__(self, reset_db: bool = False) -> None:
         super().__init__('memory_builder')
@@ -36,8 +39,6 @@ class MemoryBuilder(Node):
             self.get_logger(),
         )
         self._qdrant_service = None
-        self._data_pipeline = None
-        self._search_service = None
 
         self._initialize_services(reset_db)
 
@@ -51,11 +52,9 @@ class MemoryBuilder(Node):
         self.get_logger().info('Memory Builder node initialized successfully')
         self.get_logger().info(f'Waiting for caption data on {self._config.input_topic}...')
 
-    def _log_error(self, context: str, error: Exception, reraise: bool = True) -> None:
-        self.get_logger().error(f'{context}: {error}')
+    def _log_exception(self, context: str, exc: Exception) -> None:
+        self.get_logger().error(f'{context}: {exc}')
         self.get_logger().error(traceback.format_exc())
-        if reraise:
-            raise
 
     def _initialize_services(self, reset_db: bool) -> None:
         try:
@@ -71,6 +70,9 @@ class MemoryBuilder(Node):
 
             if reset_db:
                 self._qdrant_service.reset_database()
+                if os.path.exists(self._config.images_dir):
+                    shutil.rmtree(self._config.images_dir)
+                    self.get_logger().info(f'Removed images: {self._config.images_dir}')
             else:
                 self._qdrant_service.setup_collection()
 
@@ -78,17 +80,9 @@ class MemoryBuilder(Node):
                 f'Qdrant collection "{self._config.collection_name}" ready '
                 f'(embedding_dim={embedding_dim})')
 
-            self._data_pipeline = DataPipeline(self._embedding_service)
-
-            self._search_service = SearchService(
-                self._qdrant_service,
-                self._embedding_service,
-                self.get_logger(),
-            )
-            self.get_logger().info('Search service initialized')
-
         except Exception as e:
-            self._log_error('Service initialization failed', e)
+            self._log_exception('Service initialization failed', e)
+            raise
 
     def caption_callback(self, msg: CaptionWithPose) -> None:
         try:
@@ -108,12 +102,15 @@ class MemoryBuilder(Node):
             self._store_to_qdrant(msg)
 
         except Exception as e:
-            self._log_error('Error in caption callback', e, reraise=False)
+            self._log_exception('Error in caption callback', e)
 
     def _store_to_qdrant(self, msg: CaptionWithPose) -> None:
         try:
-            record = self._data_pipeline.process_ros_message(msg)
+            caption_data = CaptionData.from_ros_msg(msg)
+            text_embedding = self._embedding_service.encode_document(caption_data.caption)
+            record = QdrantMemoryRecord.from_caption_data(caption_data, text_embedding)
             self._qdrant_service.upsert_record(record)
+            self._save_images(record.id, [img.data for img in msg.images])
 
             self.get_logger().info(
                 f'Stored to Qdrant: "{record.caption[:50]}..." '
@@ -121,11 +118,15 @@ class MemoryBuilder(Node):
             )
 
         except Exception as e:
-            self._log_error('Failed to store to Qdrant', e, reraise=False)
+            self._log_exception('Failed to store to Qdrant', e)
 
-    @property
-    def search_service(self) -> SearchService:
-        return self._search_service
+    def _save_images(self, record_id: str, images: list) -> None:
+        out_dir = os.path.join(self._config.images_dir, record_id)
+        os.makedirs(out_dir, exist_ok=True)
+        for i, data in enumerate(images):
+            with open(os.path.join(out_dir, f'image_{i}.jpg'), 'wb') as f:
+                f.write(data)
+        self.get_logger().info(f'Saved {len(images)} images to {out_dir}')
 
     def destroy_node(self) -> None:
         self.get_logger().info('Cleaning up resources...')
@@ -143,9 +144,6 @@ class MemoryBuilder(Node):
                 self.get_logger().info('Embedding service cleaned up')
             except Exception as e:
                 self.get_logger().warning(f'Error cleaning up embedding service: {e}')
-
-        if self._data_pipeline is not None:
-            del self._data_pipeline
 
         super().destroy_node()
 

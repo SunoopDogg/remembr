@@ -21,74 +21,74 @@ class QdrantService:
         logger: Logger,
         embedding_dim: int = 0,
     ) -> None:
-        self.config = config
-        self.logger = logger
-        self.embedding_dim = embedding_dim
-        self.client = None
+        self._config = config
+        self._logger = logger
+        self._embedding_dim = embedding_dim
+        self._client = None
 
     def connect(self) -> None:
         try:
-            self.logger.info('Connecting to Qdrant...')
-            self.client = QdrantClient(url=self.config.qdrant_url)
-            self.logger.info(f'Connected to Qdrant at {self.config.qdrant_url}')
+            self._logger.info('Connecting to Qdrant...')
+            self._client = QdrantClient(url=self._config.qdrant_url)
+            self._logger.info(f'Connected to Qdrant at {self._config.qdrant_url}')
         except Exception as e:
-            self.logger.error(f'Failed to connect to Qdrant: {e}')
-            self.logger.error(traceback.format_exc())
+            self._logger.error(f'Failed to connect to Qdrant: {e}')
+            self._logger.error(traceback.format_exc())
             raise
 
     def setup_collection(self) -> None:
         """Set up Named Vectors schema; no-op if collection already exists."""
-        name = self.config.collection_name
-        if self.client.collection_exists(name):
-            self.logger.info(f'Collection {name!r} already exists')
+        name = self._config.collection_name
+        if self._client.collection_exists(name):
+            self._logger.info(f'Collection {name!r} already exists')
             return
 
-        if not self.embedding_dim:
+        if not self._embedding_dim:
             raise RuntimeError(
                 'embedding_dim must be set before creating collection'
             )
 
-        self.client.create_collection(
+        self._client.create_collection(
             collection_name=name,
             vectors_config={
-                TEXT_VECTOR:     VectorParams(size=self.embedding_dim, distance=Distance.COSINE),
+                TEXT_VECTOR:     VectorParams(size=self._embedding_dim, distance=Distance.COSINE),
                 POSITION_VECTOR: VectorParams(size=3,                  distance=Distance.EUCLID),
                 TIME_VECTOR:     VectorParams(size=2,                  distance=Distance.EUCLID),
             },
         )
-        self.logger.info(f'Created collection {name!r} (text_embedding dim={self.embedding_dim})')
+        self._logger.info(f'Created collection {name!r} (text_embedding dim={self._embedding_dim})')
 
     def reset_database(self) -> None:
-        name = self.config.collection_name
-        self.logger.info('Starting database reset...')
+        name = self._config.collection_name
+        self._logger.info('Starting database reset...')
         try:
-            if self.client.collection_exists(name):
-                self.logger.info(f'Dropping collection {name!r}...')
-                self.client.delete_collection(name)
-                self.logger.info(f'Collection {name!r} dropped')
+            if self._client.collection_exists(name):
+                self._logger.info(f'Dropping collection {name!r}...')
+                self._client.delete_collection(name)
+                self._logger.info(f'Collection {name!r} dropped')
             self.setup_collection()
-            self.logger.info('Database reset complete')
+            self._logger.info('Database reset complete')
         except Exception as e:
-            self.logger.error(f'Error during database reset: {e}')
-            self.logger.error(traceback.format_exc())
+            self._logger.error(f'Error during database reset: {e}')
+            self._logger.error(traceback.format_exc())
             raise
 
     def upsert_record(self, record: QdrantMemoryRecord) -> None:
         try:
-            self.client.upsert(
-                collection_name=self.config.collection_name,
+            self._client.upsert(
+                collection_name=self._config.collection_name,
                 points=[record.to_point()],
                 wait=True,
             )
         except Exception as e:
-            self.logger.error(f'Failed to upsert record: {e}')
-            self.logger.error(traceback.format_exc())
+            self._logger.error(f'Failed to upsert record: {e}')
+            self._logger.error(traceback.format_exc())
             raise
 
     def search(self, vector: list, using: str, limit: int) -> list:
-        """Execute Named Vector search; using must be TEXT_VECTOR / POSITION_VECTOR / TIME_VECTOR."""
-        return self.client.query_points(
-            collection_name=self.config.collection_name,
+        """Query named vector index; using must be one of the named vector constants."""
+        return self._client.query_points(
+            collection_name=self._config.collection_name,
             query=vector,
             using=using,
             limit=limit,
@@ -96,12 +96,12 @@ class QdrantService:
         ).points
 
     def collection_exists(self) -> bool:
-        return self.client.collection_exists(self.config.collection_name)
+        return self._client.collection_exists(self._config.collection_name)
 
     def close(self) -> None:
-        if self.client:
+        if self._client:
             try:
-                self.client.close()
-                self.logger.info('Qdrant connection closed')
+                self._client.close()
+                self._logger.info('Qdrant connection closed')
             except Exception as e:
-                self.logger.warning(f'Error closing Qdrant connection: {e}')
+                self._logger.warning(f'Error closing Qdrant connection: {e}')
